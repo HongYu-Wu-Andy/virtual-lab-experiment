@@ -1,0 +1,40 @@
+{
+  "name": "virtual-lab-experiment",
+  "version": "0.1.0",
+  "description": "Agent-led, reproducible machine-learning experiments for numeric tabular datasets.",
+  "author": {
+    "name": "Andy Wu",
+    "url": "https://github.com/hello-world01011"
+  },
+  "homepage": "https://github.com/hello-world01011/virtual-lab-experiment",
+  "repository": "https://github.com/hello-world01011/virtual-lab-experiment",
+  "license": "MIT",
+  "keywords": [
+    "virtual-lab",
+    "machine-learning",
+    "multi-agent",
+    "experiment-design",
+    "optimization"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Virtual Lab Experiment",
+    "shortDescription": "Run agent-led ML experiments with full provenance",
+    "longDescription": "Create an experiment-specific scientist team, compare regression models, search multi-objective candidates, and record all conversations, code, execution output, metrics, and results.",
+    "developerName": "Andy Wu",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
+    "websiteURL": "https://github.com/hello-world01011/virtual-lab-experiment",
+    "privacyPolicyURL": "https://github.com/hello-world01011/virtual-lab-experiment/blob/main/PRIVACY.md",
+    "defaultPrompt": [
+      "Use $run-virtual-lab-experiment to analyze my CSV experiment.",
+      "Create a Virtual Lab team and optimize my target parameters.",
+      "Run an offline example and record every artifact."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

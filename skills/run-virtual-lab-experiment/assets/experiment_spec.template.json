@@ -1,0 +1,62 @@
+{
+  "experiment_name": "example_experiment",
+  "description": "Describe the experiment, domain, and scientific purpose.",
+  "dataset": {
+    "path": "dataset.csv",
+    "id_column": null,
+    "drop_columns": []
+  },
+  "features": [
+    {
+      "name": "feature_1",
+      "bounds": [0.0, 1.0]
+    },
+    {
+      "name": "feature_2",
+      "bounds": [0.0, 10.0]
+    }
+  ],
+  "targets": [
+    {
+      "name": "response_1",
+      "goal": "maximize",
+      "weight": 1.0,
+      "expected_range": [0.8, null]
+    },
+    {
+      "name": "response_2",
+      "goal": "target",
+      "target_value": 5.0,
+      "weight": 1.0,
+      "expected_range": [4.5, 5.5]
+    }
+  ],
+  "constraints": [
+    {
+      "feature": "feature_1",
+      "min": 0.1,
+      "max": 0.9
+    }
+  ],
+  "validation": {
+    "test_fraction": 0.3,
+    "cv_folds": 5,
+    "group_column": null,
+    "random_seed": 42
+  },
+  "search": {
+    "candidate_count": 10000,
+    "decision_method": "auto",
+    "sensitivity_samples": 300
+  },
+  "virtual_lab": {
+    "mode": "auto",
+    "parallel_runs": 3,
+    "meeting_rounds": 2,
+    "model": "deepseek-v4-pro"
+  },
+  "output": {
+    "directory": "virtual_lab_output",
+    "obsidian_directory": null
+  }
+}

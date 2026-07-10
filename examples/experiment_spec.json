@@ -1,0 +1,65 @@
+{
+  "experiment_name": "synthetic_process_optimization",
+  "description": "Synthetic process study for demonstrating a reproducible multi-objective Virtual Lab workflow.",
+  "dataset": {
+    "path": "synthetic_experiment.csv",
+    "id_column": null,
+    "drop_columns": []
+  },
+  "features": [
+    {
+      "name": "temperature_c",
+      "bounds": [150.0, 240.0]
+    },
+    {
+      "name": "pressure_mpa",
+      "bounds": [1.0, 3.6]
+    },
+    {
+      "name": "catalyst_pct",
+      "bounds": [0.5, 2.0]
+    }
+  ],
+  "targets": [
+    {
+      "name": "yield_pct",
+      "goal": "maximize",
+      "weight": 2.0,
+      "expected_range": [80.0, null]
+    },
+    {
+      "name": "energy_kwh",
+      "goal": "minimize",
+      "weight": 1.0,
+      "expected_range": [null, 36.0]
+    }
+  ],
+  "constraints": [
+    {
+      "feature": "pressure_mpa",
+      "min": 1.0,
+      "max": 3.4
+    }
+  ],
+  "validation": {
+    "test_fraction": 0.3,
+    "cv_folds": 3,
+    "group_column": null,
+    "random_seed": 42
+  },
+  "search": {
+    "candidate_count": 2000,
+    "decision_method": "auto",
+    "sensitivity_samples": 100
+  },
+  "virtual_lab": {
+    "mode": "offline",
+    "parallel_runs": 2,
+    "meeting_rounds": 1,
+    "model": "deepseek-v4-pro"
+  },
+  "output": {
+    "directory": "../virtual_lab_output",
+    "obsidian_directory": null
+  }
+}

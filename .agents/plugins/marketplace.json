@@ -1,0 +1,21 @@
+{
+  "name": "virtual-lab-experiment",
+  "interface": {
+    "displayName": "Virtual Lab Experiment"
+  },
+  "plugins": [
+    {
+      "name": "virtual-lab-experiment",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/hello-world01011/virtual-lab-experiment.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
