@@ -17,6 +17,8 @@ Every run creates a timestamped directory containing:
 - `results/results.json`: complete machine-readable result and limitations.
 - `virtual_lab_report.md`: experiment summary, agents, conversations, code, output, and result.
 
+`execution.json`, `results.json`, and the report record the selected mode, provider, model, endpoint, and credential source label. They never record the credential value.
+
 If `obsidian_directory` is provided, `virtual_lab_report.md` is copied there with a unique experiment/run name.
 
 ## Result acceptance

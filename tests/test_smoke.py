@@ -23,7 +23,7 @@ class VirtualLabSmokeTest(unittest.TestCase):
             "hello-" + "world01011",
         )
         for path in ROOT.rglob("*"):
-            if not path.is_file() or ".git" in path.parts:
+            if not path.is_file() or ".git" in path.parts or "__pycache__" in path.parts:
                 continue
             text = path.read_text(encoding="utf-8", errors="ignore")
             for value in forbidden:

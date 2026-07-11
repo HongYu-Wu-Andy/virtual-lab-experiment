@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import random
@@ -13,6 +14,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -32,7 +34,6 @@ class Agent:
     expertise: str
     goal: str
     role: str
-    model: str = "deepseek-v4-pro"
 
     @property
     def system_prompt(self) -> str:
@@ -56,58 +57,210 @@ class Completion:
     usage: dict[str, Any]
 
 
-class DeepSeekClient:
-    def __init__(self, api_key: str, model: str) -> None:
-        self.api_key = api_key
-        self.model = model
-        self.url = "https://api.deepseek.com/chat/completions"
+@dataclass(frozen=True)
+class ProviderConfig:
+    provider: str
+    api_style: str
+    model: str
+    base_url: str
+    api_key_env: str
 
+
+PROVIDER_DEFAULTS: dict[str, dict[str, str | None]] = {
+    "openai": {
+        "api_style": "openai",
+        "base_url": "https://api.openai.com/v1/chat/completions",
+        "api_key_env": "OPENAI_API_KEY",
+        "default_model": None,
+    },
+    "deepseek": {
+        "api_style": "openai",
+        "base_url": "https://api.deepseek.com/chat/completions",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "default_model": "deepseek-v4-pro",
+    },
+    "anthropic": {
+        "api_style": "anthropic",
+        "base_url": "https://api.anthropic.com/v1/messages",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "default_model": None,
+    },
+    "google": {
+        "api_style": "google",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/models",
+        "api_key_env": "GEMINI_API_KEY",
+        "default_model": None,
+    },
+    "openai_compatible": {
+        "api_style": "openai",
+        "base_url": None,
+        "api_key_env": "VIRTUAL_LAB_API_KEY",
+        "default_model": None,
+    },
+}
+
+PROVIDER_ALIASES = {
+    "claude": "anthropic",
+    "gemini": "google",
+    "custom": "openai_compatible",
+    "openai-compatible": "openai_compatible",
+}
+
+
+def normalize_messages(messages: Sequence[dict[str, str]]) -> list[dict[str, str]]:
+    """Drop provider-specific names and merge consecutive turns with the same role."""
+    normalized: list[dict[str, str]] = []
+    for message in messages:
+        role = "assistant" if message.get("role") == "assistant" else "user"
+        content = str(message.get("content", ""))
+        if normalized and normalized[-1]["role"] == role:
+            normalized[-1]["content"] += "\n\n" + content
+        else:
+            normalized.append({"role": role, "content": content})
+    return normalized
+
+
+def response_text(value: Any) -> str | None:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        parts = [item.get("text", "") for item in value if isinstance(item, dict)]
+        text = "".join(part for part in parts if isinstance(part, str))
+        return text or None
+    return None
+
+
+class HTTPClient:
+    def __init__(self, api_key: str, config: ProviderConfig) -> None:
+        self.api_key = api_key
+        self.config = config
+
+    def post(self, url: str, payload: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
+        encoded = json.dumps(payload).encode("utf-8")
+        last_error: Exception | None = None
+        for attempt in range(4):
+            request = urllib.request.Request(
+                url,
+                data=encoded,
+                headers={"Content-Type": "application/json", **headers},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=300) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except (urllib.error.URLError, urllib.error.HTTPError, ValueError, RuntimeError) as exc:
+                last_error = exc
+                if attempt >= 3:
+                    break
+                time.sleep(min(2**attempt + random.random(), 15.0))
+        raise RuntimeError(f"{self.config.provider} API call failed: {last_error}")
+
+
+class OpenAICompatibleClient(HTTPClient):
     def complete(
         self,
         agent: Agent,
         messages: Sequence[dict[str, str]],
         temperature: float,
     ) -> Completion:
-        payload = json.dumps(
+        payload = {
+            "model": self.config.model,
+            "messages": [
+                {"role": "system", "content": agent.system_prompt},
+                *normalize_messages(messages),
+            ],
+            "temperature": temperature,
+        }
+        token_field = "max_completion_tokens" if self.config.provider == "openai" else "max_tokens"
+        payload[token_field] = 6000
+        body = self.post(
+            self.config.base_url,
+            payload,
+            {"Authorization": f"Bearer {self.api_key}"},
+        )
+        choices = body.get("choices") or []
+        content = response_text(choices[0].get("message", {}).get("content")) if choices else None
+        if not isinstance(content, str) or not content.strip():
+            raise RuntimeError(f"{self.config.provider} returned an empty response")
+        return Completion(
+            content=content.strip(),
+            model=str(body.get("model") or self.config.model),
+            usage=body.get("usage") or {},
+        )
+
+
+class AnthropicClient(HTTPClient):
+    def complete(
+        self,
+        agent: Agent,
+        messages: Sequence[dict[str, str]],
+        temperature: float,
+    ) -> Completion:
+        body = self.post(
+            self.config.base_url,
             {
-                "model": agent.model or self.model,
-                "messages": [
-                    {"role": "system", "name": agent.api_name, "content": agent.system_prompt},
-                    *messages,
-                ],
+                "model": self.config.model,
+                "system": agent.system_prompt,
+                "messages": normalize_messages(messages),
                 "temperature": temperature,
                 "max_tokens": 6000,
+            },
+            {
+                "x-api-key": self.api_key,
+                "anthropic-version": "2023-06-01",
+            },
+        )
+        content = response_text(body.get("content"))
+        if not isinstance(content, str) or not content.strip():
+            raise RuntimeError("anthropic returned an empty response")
+        return Completion(
+            content=content.strip(),
+            model=str(body.get("model") or self.config.model),
+            usage=body.get("usage") or {},
+        )
+
+
+class GoogleClient(HTTPClient):
+    def complete(
+        self,
+        agent: Agent,
+        messages: Sequence[dict[str, str]],
+        temperature: float,
+    ) -> Completion:
+        contents = [
+            {
+                "role": "model" if item["role"] == "assistant" else "user",
+                "parts": [{"text": item["content"]}],
             }
-        ).encode("utf-8")
-        last_error: Exception | None = None
-        for attempt in range(4):
-            request = urllib.request.Request(
-                self.url,
-                data=payload,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
+            for item in normalize_messages(messages)
+        ]
+        model_id = self.config.model.removeprefix("models/")
+        url = (
+            f"{self.config.base_url.rstrip('/')}"
+            f"/{urllib.parse.quote(model_id, safe='')}:generateContent"
+        )
+        body = self.post(
+            url,
+            {
+                "systemInstruction": {"parts": [{"text": agent.system_prompt}]},
+                "contents": contents,
+                "generationConfig": {
+                    "temperature": temperature,
+                    "maxOutputTokens": 6000,
                 },
-                method="POST",
-            )
-            try:
-                with urllib.request.urlopen(request, timeout=300) as response:
-                    body = json.loads(response.read().decode("utf-8"))
-                choices = body.get("choices") or []
-                content = choices[0].get("message", {}).get("content") if choices else None
-                if not isinstance(content, str) or not content.strip():
-                    raise RuntimeError("LLM returned an empty response")
-                return Completion(
-                    content=content.strip(),
-                    model=body.get("model", agent.model),
-                    usage=body.get("usage") or {},
-                )
-            except (urllib.error.URLError, urllib.error.HTTPError, ValueError, RuntimeError) as exc:
-                last_error = exc
-                if attempt >= 3:
-                    break
-                time.sleep(min(2**attempt + random.random(), 15.0))
-        raise RuntimeError(f"DeepSeek call failed: {last_error}")
+            },
+            {"x-goog-api-key": self.api_key},
+        )
+        candidates = body.get("candidates") or []
+        parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
+        content = response_text(parts)
+        if not isinstance(content, str) or not content.strip():
+            raise RuntimeError("google returned an empty response")
+        return Completion(
+            content=content.strip(),
+            model=str(body.get("modelVersion") or self.config.model),
+            usage=body.get("usageMetadata") or {},
+        )
 
 
 class OfflineClient:
@@ -226,13 +379,119 @@ def spec_for_llm(spec: dict[str, Any]) -> dict[str, Any]:
         output["directory"] = "[local output directory]"
     if output.get("obsidian_directory"):
         output["obsidian_directory"] = "[local Obsidian directory]"
+    settings = shared.get("virtual_lab") or {}
+    settings.pop("api_key_env", None)
+    settings.pop("base_url", None)
+    for forbidden in ("api_key", "token", "secret", "password"):
+        settings.pop(forbidden, None)
     return shared
 
 
-def resolve_mode(spec: dict[str, Any], override: str | None) -> str:
+def reject_inline_secrets(spec: dict[str, Any]) -> None:
+    settings = spec.get("virtual_lab") or {}
+    forbidden = [
+        key for key in ("api_key", "token", "secret", "password") if settings.get(key)
+    ]
+    if forbidden:
+        raise ValueError(
+            "Never store credentials in experiment_spec.json. Remove "
+            + ", ".join(forbidden)
+            + " and use an environment variable or --prompt-api-key."
+        )
+
+
+def normalize_provider(value: str) -> str:
+    normalized = value.strip().lower().replace("-", "_")
+    return PROVIDER_ALIASES.get(normalized, normalized)
+
+
+def validate_base_url(value: str) -> str:
+    parsed = urllib.parse.urlparse(value)
+    loopback = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+    if parsed.scheme != "https" and not (parsed.scheme == "http" and loopback):
+        raise ValueError("Provider base_url must use HTTPS, except for an HTTP loopback endpoint")
+    if not parsed.netloc:
+        raise ValueError("Provider base_url must be an absolute URL")
+    return value
+
+
+def provider_catalog() -> dict[str, dict[str, str | None]]:
+    return {
+        name: {
+            "api_style": str(settings["api_style"]),
+            "default_base_url": settings["base_url"],
+            "default_api_key_env": str(settings["api_key_env"]),
+            "model": "user supplied" if settings["default_model"] is None else str(settings["default_model"]),
+        }
+        for name, settings in PROVIDER_DEFAULTS.items()
+    }
+
+
+def resolve_provider_config(spec: dict[str, Any], args: argparse.Namespace) -> ProviderConfig:
+    settings = spec.get("virtual_lab") or {}
+    spec_provider = str(settings.get("provider", "deepseek"))
+    provider = normalize_provider(args.provider or spec_provider)
+    if provider not in PROVIDER_DEFAULTS:
+        supported = ", ".join(sorted(PROVIDER_DEFAULTS))
+        raise ValueError(f"Unsupported provider {provider!r}; choose one of: {supported}")
+    defaults = PROVIDER_DEFAULTS[provider]
+    provider_changed = bool(args.provider and normalize_provider(spec_provider) != provider)
+
+    if args.model:
+        model = args.model
+    elif args.provider and normalize_provider(spec_provider) != provider:
+        model = str(defaults.get("default_model") or "")
+    else:
+        model = str(settings.get("model") or defaults.get("default_model") or "")
+    if not model:
+        raise ValueError(f"A model identifier is required for provider {provider!r}")
+
+    configured_base_url = None if provider_changed else settings.get("base_url")
+    base_url = str(args.base_url or configured_base_url or defaults.get("base_url") or "")
+    if not base_url:
+        raise ValueError("A full base_url is required for openai_compatible providers")
+
+    configured_api_key_env = None if provider_changed else settings.get("api_key_env")
+    api_key_env = str(args.api_key_env or configured_api_key_env or defaults["api_key_env"])
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", api_key_env):
+        raise ValueError("api_key_env must be a valid environment-variable name")
+
+    return ProviderConfig(
+        provider=provider,
+        api_style=str(defaults["api_style"]),
+        model=model,
+        base_url=validate_base_url(base_url),
+        api_key_env=api_key_env,
+    )
+
+
+def resolve_api_key(config: ProviderConfig, prompt: bool) -> tuple[str | None, str | None]:
+    candidates = [config.api_key_env]
+    if config.api_key_env != "VIRTUAL_LAB_API_KEY":
+        candidates.append("VIRTUAL_LAB_API_KEY")
+    for variable in candidates:
+        value = os.environ.get(variable)
+        if value:
+            return value, variable
+    if prompt:
+        value = getpass.getpass(f"Enter API key for {config.provider}: ").strip()
+        if value:
+            return value, "interactive prompt"
+    return None, None
+
+
+def build_client(config: ProviderConfig, api_key: str):
+    if config.api_style == "anthropic":
+        return AnthropicClient(api_key, config)
+    if config.api_style == "google":
+        return GoogleClient(api_key, config)
+    return OpenAICompatibleClient(api_key, config)
+
+
+def resolve_mode(spec: dict[str, Any], override: str | None, has_api_key: bool) -> str:
     mode = override or (spec.get("virtual_lab") or {}).get("mode", "auto")
     if mode == "auto":
-        return "live" if os.environ.get("DEEPSEEK_API_KEY") else "offline"
+        return "live" if has_api_key else "offline"
     if mode not in {"live", "offline"}:
         raise ValueError("Virtual Lab mode must be auto, live, or offline")
     return mode
@@ -255,7 +514,7 @@ def parse_json_response(text: str) -> dict[str, Any]:
     raise ValueError("Could not parse JSON from agent response")
 
 
-def generate_agents(client, spec: dict[str, Any], model: str, events: list[dict[str, Any]]) -> list[Agent]:
+def generate_agents(client, spec: dict[str, Any], events: list[dict[str, Any]]) -> list[Agent]:
     prompt = (
         "[CREATE_AGENTS_JSON] Create exactly three scientist agents tailored to this experiment: one domain "
         "science expert, one experimental-design/statistics expert, and one machine-learning/optimization "
@@ -291,7 +550,7 @@ def generate_agents(client, spec: dict[str, Any], model: str, events: list[dict[
         required = [str(definition.get(key, "")).strip() for key in ("title", "expertise", "goal", "role")]
         if any(not value for value in required):
             raise ValueError("Generated agent lacks title, expertise, goal, or role")
-        agents.append(Agent(*required, model=model))
+        agents.append(Agent(*required))
     return agents
 
 
@@ -448,6 +707,8 @@ def report_markdown(
             f"# Virtual Lab Experiment: {spec['experiment_name']}",
             "",
             f"**Mode:** `{mode}`",
+            f"**Provider:** `{results.get('virtual_lab', {}).get('provider', 'offline')}`",
+            f"**Model:** `{results.get('virtual_lab', {}).get('model', 'offline-deterministic')}`",
             f"**Description:** {spec['description']}",
             f"**Decision method:** `{results['decision_method']}`",
             f"**Predicted expectations met:** `{results['selected']['expectations_met']}`",
@@ -491,24 +752,52 @@ def report_markdown(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--spec", type=Path, required=True)
+    parser.add_argument("--spec", type=Path)
     parser.add_argument("--mode", choices=("auto", "live", "offline"))
+    parser.add_argument("--provider")
+    parser.add_argument("--model")
+    parser.add_argument("--base-url")
+    parser.add_argument("--api-key-env")
+    parser.add_argument("--prompt-api-key", action="store_true")
+    parser.add_argument("--list-providers", action="store_true")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--obsidian-dir", type=Path)
     parser.add_argument("--quick", action="store_true")
     args = parser.parse_args()
 
+    if args.list_providers:
+        print(json.dumps(provider_catalog(), indent=2))
+        return
+    if args.spec is None:
+        parser.error("--spec is required unless --list-providers is used")
+
     spec_path = args.spec.expanduser().resolve()
     validated = pipeline_core.load_spec(spec_path)
     spec = json.loads(json.dumps(validated.raw))
-    mode = resolve_mode(spec, args.mode)
-    settings = spec.get("virtual_lab") or {}
-    model = str(settings.get("model", "deepseek-v4-pro"))
+    reject_inline_secrets(spec)
+    provider_config = resolve_provider_config(spec, args)
+    settings = spec.setdefault("virtual_lab", {})
+    settings.update(
+        {
+            "provider": provider_config.provider,
+            "model": provider_config.model,
+            "base_url": provider_config.base_url,
+            "api_key_env": provider_config.api_key_env,
+        }
+    )
+    requested_mode = args.mode or settings.get("mode", "auto")
+    api_key, credential_source = resolve_api_key(
+        provider_config,
+        prompt=args.prompt_api_key and requested_mode != "offline",
+    )
+    mode = resolve_mode(spec, args.mode, bool(api_key))
     if mode == "live":
-        key = os.environ.get("DEEPSEEK_API_KEY")
-        if not key:
-            raise RuntimeError("DEEPSEEK_API_KEY is required for live mode")
-        client = DeepSeekClient(key, model)
+        if not api_key:
+            raise RuntimeError(
+                f"Live mode requires {provider_config.api_key_env}, "
+                "VIRTUAL_LAB_API_KEY, or --prompt-api-key"
+            )
+        client = build_client(provider_config, api_key)
     else:
         client = OfflineClient()
 
@@ -535,7 +824,7 @@ def main() -> None:
 
     events: list[dict[str, Any]] = []
     shared_spec = spec_for_llm(spec)
-    agents = generate_agents(client, shared_spec, model, events)
+    agents = generate_agents(client, shared_spec, events)
     (run_dir / "agents.json").write_text(
         json.dumps([asdict(agent) for agent in agents], indent=2, ensure_ascii=False), encoding="utf-8"
     )
@@ -613,6 +902,13 @@ def main() -> None:
         "stdout": completed.stdout,
         "stderr": completed.stderr,
         "elapsed_seconds": round(time.monotonic() - started, 3),
+        "llm": {
+            "mode": mode,
+            "provider": provider_config.provider,
+            "model": provider_config.model,
+            "base_url": provider_config.base_url,
+            "credential_source": credential_source if mode == "live" else None,
+        },
     }
     (run_dir / "execution.json").write_text(
         json.dumps(execution, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -636,6 +932,10 @@ def main() -> None:
     )
     results["virtual_lab"] = {
         "mode": mode,
+        "provider": provider_config.provider,
+        "model": provider_config.model,
+        "base_url": provider_config.base_url,
+        "credential_source": credential_source if mode == "live" else None,
         "generated_agents": [agent.title for agent in agents],
         "decision_summary": method_summary,
         "final_review": final_summary,
@@ -670,6 +970,8 @@ def main() -> None:
             {
                 "status": "success",
                 "mode": mode,
+                "provider": provider_config.provider,
+                "model": provider_config.model,
                 "run_directory": str(run_dir),
                 "report": str(report_path),
                 "obsidian_report": str(obsidian_path) if obsidian_path else None,

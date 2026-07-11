@@ -99,11 +99,28 @@ When `decision_method` is `auto`, the Agent discussion chooses a method. If the 
 `virtual_lab`:
 
 - `mode`: `auto`, `live`, or `offline`.
+- `provider`: `openai`, `deepseek`, `anthropic`, `google`, or `openai_compatible`.
+- `model`: exact model identifier accepted by the selected provider.
+- `api_key_env`: optional environment-variable name containing the key.
+- `base_url`: optional provider endpoint override; required for `openai_compatible`.
 - `parallel_runs`: independent creative meetings; default 3.
 - `meeting_rounds`: specialist discussion rounds; default 2.
-- `model`: DeepSeek model identifier.
 
-`auto` uses live agents when `DEEPSEEK_API_KEY` exists and otherwise uses a clearly labeled deterministic offline team.
+Default credential variables are `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, and `GEMINI_API_KEY`. `VIRTUAL_LAB_API_KEY` is a provider-independent fallback. `auto` uses live agents when a configured credential is available and otherwise uses a clearly labeled deterministic offline team.
+
+Use `openai_compatible` for providers exposing a compatible Chat Completions endpoint:
+
+```json
+{
+  "mode": "live",
+  "provider": "openai_compatible",
+  "model": "provider-model-id",
+  "base_url": "https://provider.example/v1/chat/completions",
+  "api_key_env": "PROVIDER_API_KEY"
+}
+```
+
+Never add an `api_key`, `token`, `secret`, or `password` field. The runner rejects inline credentials. For interactive entry, run with `--prompt-api-key`; the input is hidden and not persisted.
 
 ## Output settings
 
@@ -112,7 +129,7 @@ When `decision_method` is `auto`, the Agent discussion chooses a method. If the 
 - `directory`: parent directory for timestamped run artifacts.
 - `obsidian_directory`: optional folder for the complete Markdown handoff.
 
-Do not put secrets in the spec.
+Do not put secrets in the spec, output directory, or Obsidian notes.
 
 ## Complete example
 

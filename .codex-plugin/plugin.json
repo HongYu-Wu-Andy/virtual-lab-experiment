@@ -1,7 +1,7 @@
 {
   "name": "virtual-lab-experiment",
-  "version": "0.1.1",
-  "description": "Agent-led, reproducible machine-learning experiments for numeric tabular datasets.",
+  "version": "0.2.0",
+  "description": "Provider-selectable, agent-led machine-learning experiments for numeric tabular datasets.",
   "author": {
     "name": "Andy Wu",
     "url": "https://github.com/HongYu-Wu-Andy"
@@ -20,7 +20,7 @@
   "interface": {
     "displayName": "Virtual Lab Experiment",
     "shortDescription": "Run agent-led ML experiments with full provenance",
-    "longDescription": "Create an experiment-specific scientist team, compare regression models, search multi-objective candidates, and record all conversations, code, execution output, metrics, and results.",
+    "longDescription": "Choose an LLM provider and model, create an experiment-specific scientist team, compare regression models, search multi-objective candidates, and record all conversations, code, execution output, metrics, and results.",
     "developerName": "Andy Wu",
     "category": "Productivity",
     "capabilities": [
@@ -31,7 +31,7 @@
     "websiteURL": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment",
     "privacyPolicyURL": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment/blob/main/PRIVACY.md",
     "defaultPrompt": [
-      "Use $run-virtual-lab-experiment to analyze my CSV experiment.",
+      "Use $run-virtual-lab-experiment with my chosen provider and model.",
       "Create a Virtual Lab team and optimize my target parameters.",
       "Run an offline example and record every artifact."
     ],

@@ -54,6 +54,9 @@
   },
   "virtual_lab": {
     "mode": "offline",
+    "provider": "deepseek",
+    "api_key_env": "DEEPSEEK_API_KEY",
+    "base_url": null,
     "parallel_runs": 2,
     "meeting_rounds": 1,
     "model": "deepseek-v4-pro"

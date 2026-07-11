@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — 2026-07-11
+
+- Added user-selectable OpenAI, DeepSeek, Anthropic, Google Gemini, and custom OpenAI-compatible providers.
+- Added provider/model/base-URL overrides and `--list-providers`.
+- Added provider-specific environment variables, generic `VIRTUAL_LAB_API_KEY`, and hidden `--prompt-api-key` entry.
+- Added inline-secret rejection and ensured credential values never enter specifications or artifacts.
+- Added mocked request/response tests for every native API style.
+
 ## 0.1.1 — 2026-07-11
 
 - Updated the GitHub owner, repository links, marketplace source, and installation instructions to `HongYu-Wu-Andy` after the account rename.
