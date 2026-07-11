@@ -39,7 +39,7 @@ The repository owner must first grant the user GitHub access. The user also need
 Add the repository as a Codex marketplace:
 
 ```bash
-codex plugin marketplace add hello-world01011/virtual-lab-experiment --ref main
+codex plugin marketplace add HongYu-Wu-Andy/virtual-lab-experiment --ref main
 ```
 
 Then install it from the Codex or ChatGPT desktop plugin directory. CLI users can run:

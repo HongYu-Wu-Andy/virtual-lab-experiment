@@ -1,13 +1,13 @@
 {
   "name": "virtual-lab-experiment",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Agent-led, reproducible machine-learning experiments for numeric tabular datasets.",
   "author": {
     "name": "Andy Wu",
-    "url": "https://github.com/hello-world01011"
+    "url": "https://github.com/HongYu-Wu-Andy"
   },
-  "homepage": "https://github.com/hello-world01011/virtual-lab-experiment",
-  "repository": "https://github.com/hello-world01011/virtual-lab-experiment",
+  "homepage": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment",
+  "repository": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment",
   "license": "MIT",
   "keywords": [
     "virtual-lab",
@@ -28,8 +28,8 @@
       "Write",
       "Interactive"
     ],
-    "websiteURL": "https://github.com/hello-world01011/virtual-lab-experiment",
-    "privacyPolicyURL": "https://github.com/hello-world01011/virtual-lab-experiment/blob/main/PRIVACY.md",
+    "websiteURL": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment",
+    "privacyPolicyURL": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment/blob/main/PRIVACY.md",
     "defaultPrompt": [
       "Use $run-virtual-lab-experiment to analyze my CSV experiment.",
       "Create a Virtual Lab team and optimize my target parameters.",

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 — 2026-07-11
+
+- Updated the GitHub owner, repository links, marketplace source, and installation instructions to `HongYu-Wu-Andy` after the account rename.
+
 ## 0.1.0 — 2026-07-10
 
 - Added the distributable Codex plugin manifest and private GitHub marketplace.

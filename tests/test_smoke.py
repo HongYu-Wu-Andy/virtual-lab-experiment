@@ -20,6 +20,7 @@ class VirtualLabSmokeTest(unittest.TestCase):
             "/Users/" + "andywu",
             "ALL_" + "data.csv",
             "gh" + "p_",
+            "hello-" + "world01011",
         )
         for path in ROOT.rglob("*"):
             if not path.is_file() or ".git" in path.parts:

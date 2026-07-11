@@ -8,7 +8,7 @@
       "name": "virtual-lab-experiment",
       "source": {
         "source": "url",
-        "url": "https://github.com/hello-world01011/virtual-lab-experiment.git",
+        "url": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment.git",
         "ref": "main"
       },
       "policy": {
