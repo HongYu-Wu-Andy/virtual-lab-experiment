@@ -377,8 +377,8 @@ def spec_for_llm(spec: dict[str, Any]) -> dict[str, Any]:
     output = shared.get("output") or {}
     if output.get("directory"):
         output["directory"] = "[local output directory]"
-    if output.get("obsidian_directory"):
-        output["obsidian_directory"] = "[local Obsidian directory]"
+    if output.get("handoff_directory"):
+        output["handoff_directory"] = "[local handoff directory]"
     settings = shared.get("virtual_lab") or {}
     settings.pop("api_key_env", None)
     settings.pop("base_url", None)
@@ -761,7 +761,11 @@ def main() -> None:
     parser.add_argument("--prompt-api-key", action="store_true")
     parser.add_argument("--list-providers", action="store_true")
     parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--obsidian-dir", type=Path)
+    parser.add_argument(
+        "--handoff-dir",
+        type=Path,
+        help="copy the complete Markdown report into this folder",
+    )
     parser.add_argument("--quick", action="store_true")
     args = parser.parse_args()
 
@@ -951,19 +955,19 @@ def main() -> None:
     report_path = run_dir / "virtual_lab_report.md"
     report_path.write_text(report, encoding="utf-8")
 
-    obsidian_value = args.obsidian_dir or (
-        Path(spec.get("output", {}).get("obsidian_directory"))
-        if spec.get("output", {}).get("obsidian_directory")
+    handoff_value = args.handoff_dir or (
+        Path(spec.get("output", {}).get("handoff_directory"))
+        if spec.get("output", {}).get("handoff_directory")
         else None
     )
-    obsidian_path = None
-    if obsidian_value:
-        obsidian_dir = obsidian_value.expanduser().resolve()
-        obsidian_dir.mkdir(parents=True, exist_ok=True)
-        obsidian_path = obsidian_dir / (
-            f"Virtual Lab - {safe_name(spec['experiment_name'])} - {run_id}.md"
+    handoff_path = None
+    if handoff_value:
+        handoff_dir = handoff_value.expanduser().resolve()
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+        handoff_path = handoff_dir / (
+            f"Virtual Lab Handoff - {safe_name(spec['experiment_name'])} - {run_id}.md"
         )
-        shutil.copy2(report_path, obsidian_path)
+        shutil.copy2(report_path, handoff_path)
 
     print(
         json.dumps(
@@ -974,7 +978,7 @@ def main() -> None:
                 "model": provider_config.model,
                 "run_directory": str(run_dir),
                 "report": str(report_path),
-                "obsidian_report": str(obsidian_path) if obsidian_path else None,
+                "handoff_report": str(handoff_path) if handoff_path else None,
                 "selected": results["selected"],
             },
             indent=2,

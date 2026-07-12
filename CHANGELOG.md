@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 — 2026-07-12
+
+- Replaced the platform-specific handoff option with a generic Markdown handoff directory.
+- Renamed the CLI option to `--handoff-dir`, the specification field to `handoff_directory`, and the execution summary field to `handoff_report`.
+- Updated the public workflow diagram, documentation, schemas, examples, privacy language, and tests to use platform-neutral Markdown terminology.
+
 ## 0.2.0 — 2026-07-11
 
 - Prepared the repository for public beta with CI across Python 3.11-3.13, packaging checks, dependency updates, and a redacted full-history secret audit.

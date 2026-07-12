@@ -1,6 +1,6 @@
 {
   "name": "virtual-lab-experiment",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Reproducible, agent-led machine-learning experiments for numeric tabular datasets.",
   "author": {
     "name": "Andy Wu",

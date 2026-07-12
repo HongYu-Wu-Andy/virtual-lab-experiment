@@ -1,6 +1,6 @@
 ---
 name: run-virtual-lab-experiment
-description: Run an agent-led Virtual Lab for numeric tabular experiment datasets with a user-selected LLM provider and model, automatically creating domain-specific scientist agents, conducting and merging research meetings, training and validating multi-target regression models, searching parameter candidates, and recording every conversation, generated code, execution output, metric, Pareto candidate, and final result. Use when a user provides a CSV/TSV dataset and asks to optimize parameters, build an ML surrogate, create a digital/virtual laboratory, choose an AI provider/model, or save a reproducible experiment report or Obsidian handoff.
+description: Run an agent-led Virtual Lab for numeric tabular experiment datasets with a user-selected LLM provider and model, automatically creating domain-specific scientist agents, conducting and merging research meetings, training and validating multi-target regression models, searching parameter candidates, and recording every conversation, generated code, execution output, metric, Pareto candidate, and final result. Use when a user provides a CSV/TSV dataset and asks to optimize parameters, build an ML surrogate, create a digital/virtual laboratory, choose an AI provider/model, or save a reproducible Markdown experiment handoff.
 ---
 
 # Run Virtual Lab Experiment
@@ -19,7 +19,7 @@ Obtain or infer these inputs:
 6. Desired value/range for each target when the user has one.
 7. Feature bounds and hard constraints.
 8. Optional group column for leakage-resistant validation.
-9. Output directory and optional Obsidian directory.
+9. Output directory and optional Markdown handoff directory.
 10. Live-mode provider and exact model identifier.
 11. Credential method: provider environment variable, `VIRTUAL_LAB_API_KEY`, or hidden interactive prompt.
 
@@ -71,7 +71,7 @@ python scripts/run_virtual_lab.py --spec experiment_spec.json --mode offline --q
 ```
 
 ```bash
-python scripts/run_virtual_lab.py --spec experiment_spec.json --obsidian-dir path/to/vault/folder
+python scripts/run_virtual_lab.py --spec experiment_spec.json --handoff-dir path/to/report/folder
 ```
 
 Resolve script paths relative to this skill directory. Do not copy the skill's scripts into the user's source repository unless the user asks.
@@ -104,7 +104,7 @@ Confirm:
 7. Decision weights and sensitivity are recorded.
 8. `conversations.json`, `generated_pipeline.py`, and `execution.json` exist.
 9. `virtual_lab_report.md` contains conversations, code, output, results, and limitations.
-10. Any Obsidian copy exists when requested.
+10. Any requested Markdown handoff copy exists.
 11. Provider and model metadata match the requested configuration, and no credential value appears in any artifact.
 
 If validation fails, report the exact failure and retain partial artifacts. Do not summarize a failed run as successful.
