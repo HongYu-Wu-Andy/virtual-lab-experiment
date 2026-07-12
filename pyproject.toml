@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "virtual-lab-experiment"
+version = "0.2.0"
+description = "Reproducible, agent-led ML experiments for numeric datasets"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "Andy Wu"}]
+keywords = [
+  "ai-agents",
+  "experiment-design",
+  "machine-learning",
+  "multi-objective-optimization",
+  "reproducibility",
+]
+dependencies = [
+  "numpy>=2.0,<3",
+  "pandas>=2.2,<4",
+  "scikit-learn>=1.5,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment"
+Repository = "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment"
+Issues = "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment/issues"
+
+[project.scripts]
+virtual-lab-experiment = "run_virtual_lab:main"
+
+[tool.setuptools]
+py-modules = ["pipeline_core", "run_virtual_lab"]
+package-dir = {"" = "skills/run-virtual-lab-experiment/scripts"}

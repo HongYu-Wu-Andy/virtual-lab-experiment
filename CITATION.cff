@@ -1,0 +1,65 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it and the research that inspired the workflow."
+title: "Virtual Lab Experiment"
+type: software
+version: 0.2.0
+date-released: 2026-07-12
+authors:
+  - family-names: Wu
+    given-names: Andy
+repository-code: "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment"
+url: "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment"
+license: MIT
+keywords:
+  - AI agents
+  - experimental design
+  - machine learning
+  - multi-objective optimization
+  - reproducible research
+references:
+  - type: article
+    title: "The Virtual Lab of AI agents designs new SARS-CoV-2 nanobodies"
+    authors:
+      - family-names: Swanson
+        given-names: Kyle
+      - family-names: Wu
+        given-names: Wesley
+      - family-names: Bulaong
+        given-names: Nash L.
+      - family-names: Pak
+        given-names: John E.
+      - family-names: Zou
+        given-names: James
+    journal: Nature
+    volume: 646
+    start: 716
+    end: 723
+    year: 2025
+    doi: 10.1038/s41586-025-09442-9
+  - type: article
+    title: "Additive manufacturing metallurgy guided machine learning design of versatile alloys"
+    authors:
+      - family-names: Su
+        given-names: Jinlong
+      - family-names: Chen
+        given-names: Lequn
+      - family-names: Van Petegem
+        given-names: Steven
+      - family-names: Jiang
+        given-names: Fulin
+      - family-names: Li
+        given-names: Qinzhi
+      - family-names: Luan
+        given-names: Junhua
+      - family-names: Sing
+        given-names: Swee Leong
+      - family-names: Wang
+        given-names: Jian
+      - family-names: Tan
+        given-names: Chaolin
+    journal: Materials Today
+    volume: 88
+    start: 240
+    end: 250
+    year: 2025
+    doi: 10.1016/j.mattod.2025.06.031

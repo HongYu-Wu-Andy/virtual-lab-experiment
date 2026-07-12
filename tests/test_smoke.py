@@ -38,6 +38,28 @@ class VirtualLabSmokeTest(unittest.TestCase):
         self.assertEqual(manifest["skills"], "./skills/")
         self.assertEqual(marketplace["plugins"][0]["name"], manifest["name"])
 
+    def test_public_release_files_and_attribution(self) -> None:
+        required = [
+            "CITATION.cff",
+            "CODE_OF_CONDUCT.md",
+            "CONTRIBUTING.md",
+            "pyproject.toml",
+            "scripts/check_secrets.py",
+            ".github/workflows/ci.yml",
+            ".github/dependabot.yml",
+            "docs/assets/social-preview.png",
+        ]
+        for relative in required:
+            self.assertTrue((ROOT / relative).is_file(), relative)
+
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("10.1038/s41586-025-09442-9", readme)
+        self.assertIn("10.1016/j.mattod.2025.06.031", readme)
+        self.assertNotIn("Install from the private repository", readme)
+
+        pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn('virtual-lab-experiment = "run_virtual_lab:main"', pyproject)
+
     def test_offline_end_to_end(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             completed = subprocess.run(
