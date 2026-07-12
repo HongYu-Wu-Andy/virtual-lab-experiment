@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "virtual-lab-experiment"
-version = "0.2.1"
+version = "0.2.2"
 description = "Reproducible, agent-led ML experiments for numeric datasets"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,9 +24,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment"
-Repository = "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment"
-Issues = "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment/issues"
+Homepage = "https://github.com/WUHYA/virtual-lab-experiment"
+Repository = "https://github.com/WUHYA/virtual-lab-experiment"
+Issues = "https://github.com/WUHYA/virtual-lab-experiment/issues"
 
 [project.scripts]
 virtual-lab-experiment = "run_virtual_lab:main"

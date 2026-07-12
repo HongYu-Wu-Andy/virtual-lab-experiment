@@ -6,7 +6,7 @@ Security fixes are applied to the latest release on `main` during the initial pr
 
 ## Reporting a vulnerability
 
-Do not open a public issue containing a secret, private dataset, exploit, or sensitive path. Use [GitHub private vulnerability reporting](https://github.com/HongYu-Wu-Andy/virtual-lab-experiment/security/advisories/new) and include a minimal reproduction with sensitive values removed.
+Do not open a public issue containing a secret, private dataset, exploit, or sensitive path. Use [GitHub private vulnerability reporting](https://github.com/WUHYA/virtual-lab-experiment/security/advisories/new) and include a minimal reproduction with sensitive values removed.
 
 If a credential has been exposed, revoke and rotate it before reporting. Do not paste the credential into the report.
 

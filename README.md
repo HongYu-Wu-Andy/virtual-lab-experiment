@@ -1,6 +1,6 @@
 # Virtual Lab Experiment
 
-[![CI](https://github.com/HongYu-Wu-Andy/virtual-lab-experiment/actions/workflows/ci.yml/badge.svg)](https://github.com/HongYu-Wu-Andy/virtual-lab-experiment/actions/workflows/ci.yml)
+[![CI](https://github.com/WUHYA/virtual-lab-experiment/actions/workflows/ci.yml/badge.svg)](https://github.com/WUHYA/virtual-lab-experiment/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Public beta](https://img.shields.io/badge/status-public%20beta-6f42c1)](CHANGELOG.md)
 
@@ -61,7 +61,7 @@ Python 3.11 or newer is recommended.
 Add this public repository as a Codex marketplace and install the plugin:
 
 ```bash
-codex plugin marketplace add HongYu-Wu-Andy/virtual-lab-experiment --ref main
+codex plugin marketplace add WUHYA/virtual-lab-experiment --ref main
 codex plugin add virtual-lab-experiment@virtual-lab-experiment
 ```
 
