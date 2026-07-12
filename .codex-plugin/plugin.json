@@ -1,7 +1,7 @@
 {
   "name": "virtual-lab-experiment",
   "version": "0.2.0",
-  "description": "Provider-selectable, agent-led machine-learning experiments for numeric tabular datasets.",
+  "description": "Reproducible, agent-led machine-learning experiments for numeric tabular datasets.",
   "author": {
     "name": "Andy Wu",
     "url": "https://github.com/HongYu-Wu-Andy"
@@ -19,7 +19,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Virtual Lab Experiment",
-    "shortDescription": "Run agent-led ML experiments with full provenance",
+    "shortDescription": "Run reproducible agent-led ML experiments",
     "longDescription": "Choose an LLM provider and model, create an experiment-specific scientist team, compare regression models, search multi-objective candidates, and record all conversations, code, execution output, metrics, and results.",
     "developerName": "Andy Wu",
     "category": "Productivity",

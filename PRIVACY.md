@@ -37,3 +37,7 @@ Review artifacts before sharing them. Obsidian output is optional and remains un
 Live mode reads the configured provider environment variable, `VIRTUAL_LAB_API_KEY`, or a hidden interactive prompt. Supported defaults are `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, and `GEMINI_API_KEY`.
 
 The runner rejects inline `api_key`, `token`, `secret`, and `password` fields. Credential values are not written to the experiment specification, report, conversation log, execution metadata, or result files. Artifacts record only the provider, model, endpoint, and credential source label.
+
+## Public repository
+
+The repository contains only a synthetic example dataset. Do not open an issue or pull request containing a private dataset, generated confidential report, personal path, or provider credential. Review all artifacts before sharing them publicly.

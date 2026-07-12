@@ -2,6 +2,9 @@
 
 ## 0.2.0 — 2026-07-11
 
+- Prepared the repository for public beta with CI across Python 3.11-3.13, packaging checks, dependency updates, and a redacted full-history secret audit.
+- Added public installation guidance, a workflow diagram, an example result, project scope, roadmap, community templates, and scientific attribution.
+- Added installable project metadata and the `virtual-lab-experiment` command.
 - Added user-selectable OpenAI, DeepSeek, Anthropic, Google Gemini, and custom OpenAI-compatible providers.
 - Added provider/model/base-URL overrides and `--list-providers`.
 - Added provider-specific environment variables, generic `VIRTUAL_LAB_API_KEY`, and hidden `--prompt-api-key` entry.
