@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-07-12
+
+- Updated the repository owner, package links, plugin marketplace source, installation command, CI badge, security URLs, and citation metadata to `WUHYA`.
+
 ## 0.2.1 — 2026-07-12
 
 - Replaced the platform-specific handoff option with a generic Markdown handoff directory.
@@ -19,7 +23,7 @@
 
 ## 0.1.1 — 2026-07-11
 
-- Updated the GitHub owner, repository links, marketplace source, and installation instructions to `HongYu-Wu-Andy` after the account rename.
+- Updated repository-owner links and installation metadata after an earlier account rename.
 
 ## 0.1.0 — 2026-07-10
 

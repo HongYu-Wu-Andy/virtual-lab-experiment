@@ -1,13 +1,13 @@
 {
   "name": "virtual-lab-experiment",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Reproducible, agent-led machine-learning experiments for numeric tabular datasets.",
   "author": {
     "name": "Andy Wu",
-    "url": "https://github.com/HongYu-Wu-Andy"
+    "url": "https://github.com/WUHYA"
   },
-  "homepage": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment",
-  "repository": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment",
+  "homepage": "https://github.com/WUHYA/virtual-lab-experiment",
+  "repository": "https://github.com/WUHYA/virtual-lab-experiment",
   "license": "MIT",
   "keywords": [
     "virtual-lab",
@@ -28,8 +28,8 @@
       "Write",
       "Interactive"
     ],
-    "websiteURL": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment",
-    "privacyPolicyURL": "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment/blob/main/PRIVACY.md",
+    "websiteURL": "https://github.com/WUHYA/virtual-lab-experiment",
+    "privacyPolicyURL": "https://github.com/WUHYA/virtual-lab-experiment/blob/main/PRIVACY.md",
     "defaultPrompt": [
       "Use $run-virtual-lab-experiment with my chosen provider and model.",
       "Create a Virtual Lab team and optimize my target parameters.",

@@ -2,13 +2,13 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it and the research that inspired the workflow."
 title: "Virtual Lab Experiment"
 type: software
-version: 0.2.1
+version: 0.2.2
 date-released: 2026-07-12
 authors:
   - family-names: Wu
     given-names: Andy
-repository-code: "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment"
-url: "https://github.com/HongYu-Wu-Andy/virtual-lab-experiment"
+repository-code: "https://github.com/WUHYA/virtual-lab-experiment"
+url: "https://github.com/WUHYA/virtual-lab-experiment"
 license: MIT
 keywords:
   - AI agents

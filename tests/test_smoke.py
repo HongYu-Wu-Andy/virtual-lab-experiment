@@ -21,10 +21,16 @@ class VirtualLabSmokeTest(unittest.TestCase):
             "ALL_" + "data.csv",
             "gh" + "p_",
             "hello-" + "world01011",
+            "HongYu-" + "Wu-Andy",
+            "Hong-Yu-" + "Wu-Andy",
         )
-        for path in ROOT.rglob("*"):
-            if not path.is_file() or ".git" in path.parts or "__pycache__" in path.parts:
+        tracked = subprocess.check_output(
+            ["git", "ls-files", "-z"], cwd=ROOT
+        ).decode().split("\0")
+        for relative in tracked:
+            if not relative:
                 continue
+            path = ROOT / relative
             text = path.read_text(encoding="utf-8", errors="ignore")
             for value in forbidden:
                 self.assertNotIn(value, text, f"private value found in {path}")
