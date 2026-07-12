@@ -23,7 +23,7 @@ The runner accepts one JSON file with these top-level objects:
 - `validation`: holdout and cross-validation settings.
 - `search`: candidate search and decision settings.
 - `virtual_lab`: live/offline agent settings.
-- `output`: artifact and optional Obsidian locations.
+- `output`: artifact and optional Markdown handoff locations.
 
 Supported dataset types are `.csv` and `.tsv`. All selected feature and target columns must be numeric after parsing.
 
@@ -127,9 +127,9 @@ Never add an `api_key`, `token`, `secret`, or `password` field. The runner rejec
 `output`:
 
 - `directory`: parent directory for timestamped run artifacts.
-- `obsidian_directory`: optional folder for the complete Markdown handoff.
+- `handoff_directory`: optional folder for the complete Markdown handoff.
 
-Do not put secrets in the spec, output directory, or Obsidian notes.
+Do not put secrets in the spec, output directory, or Markdown handoff.
 
 ## Complete example
 

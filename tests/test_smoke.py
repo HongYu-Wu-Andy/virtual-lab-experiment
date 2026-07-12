@@ -29,6 +29,18 @@ class VirtualLabSmokeTest(unittest.TestCase):
             for value in forbidden:
                 self.assertNotIn(value, text, f"private value found in {path}")
 
+    def test_public_files_use_platform_neutral_handoff_language(self) -> None:
+        platform_name = "ob" + "sidian"
+        tracked = subprocess.check_output(
+            ["git", "ls-files", "-z"], cwd=ROOT
+        ).decode().split("\0")
+        for relative in tracked:
+            if not relative:
+                continue
+            path = ROOT / relative
+            text = path.read_text(encoding="utf-8", errors="ignore").lower()
+            self.assertNotIn(platform_name, text, f"platform-specific term found in {path}")
+
     def test_manifest_and_marketplace(self) -> None:
         manifest = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text())
         marketplace = json.loads(
@@ -62,6 +74,7 @@ class VirtualLabSmokeTest(unittest.TestCase):
 
     def test_offline_end_to_end(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
+            handoff_dir = Path(temporary) / "markdown-handoff"
             completed = subprocess.run(
                 [
                     sys.executable,
@@ -73,6 +86,8 @@ class VirtualLabSmokeTest(unittest.TestCase):
                     "--quick",
                     "--output-dir",
                     temporary,
+                    "--handoff-dir",
+                    str(handoff_dir),
                 ],
                 cwd=ROOT,
                 capture_output=True,
@@ -82,6 +97,10 @@ class VirtualLabSmokeTest(unittest.TestCase):
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
             summary = json.loads(completed.stdout)
+            handoff_report = Path(summary["handoff_report"])
+            self.assertTrue(handoff_report.is_file())
+            self.assertEqual(handoff_report.parent, handoff_dir.resolve())
+            self.assertEqual(handoff_report.suffix, ".md")
             run_dir = Path(summary["run_directory"])
             required = [
                 "agents.json",

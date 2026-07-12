@@ -60,6 +60,6 @@
   },
   "output": {
     "directory": "virtual_lab_output",
-    "obsidian_directory": null
+    "handoff_directory": null
   }
 }

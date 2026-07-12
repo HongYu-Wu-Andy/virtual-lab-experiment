@@ -28,7 +28,7 @@ flowchart LR
     D --> E["Scientific Critic + PI merge"]
     E --> F["Model comparison and candidate search"]
     F --> G["Pareto candidates + sensitivity analysis"]
-    G --> H["Complete report and Obsidian handoff"]
+    G --> H["Complete report and Markdown handoff"]
     H --> I["Human review and real experiment"]
     I -. "new evidence" .-> A
     J["Selected LLM provider"] --> C
@@ -148,7 +148,7 @@ The timestamped run directory contains:
 - `results/selected_result.csv` and `results/results.json`
 - `virtual_lab_report.md`
 
-Use `--obsidian-dir` or `obsidian_directory` to copy the complete report into an Obsidian vault.
+Use `--handoff-dir` or `handoff_directory` to copy the complete `.md` report into any chosen folder.
 
 ## Repository contents
 

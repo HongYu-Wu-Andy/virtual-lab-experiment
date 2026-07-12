@@ -19,7 +19,7 @@ Every run creates a timestamped directory containing:
 
 `execution.json`, `results.json`, and the report record the selected mode, provider, model, endpoint, and credential source label. They never record the credential value.
 
-If `obsidian_directory` is provided, `virtual_lab_report.md` is copied there with a unique experiment/run name.
+If `handoff_directory` is provided, `virtual_lab_report.md` is copied there as a uniquely named `.md` handoff.
 
 ## Result acceptance
 
