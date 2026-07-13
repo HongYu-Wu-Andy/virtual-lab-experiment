@@ -4,7 +4,9 @@ import argparse
 import json
 import sys
 import unittest
+import urllib.error
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 
@@ -165,6 +167,97 @@ class ProviderClientTest(unittest.TestCase):
         self.assertNotIn("api_key", shared["virtual_lab"])
         self.assertNotIn("api_key_env", shared["virtual_lab"])
         self.assertNotIn("base_url", shared["virtual_lab"])
+
+    def test_nested_credentials_are_rejected_and_recursively_redacted(self) -> None:
+        spec = {
+            "metadata": {"authentication": {"access_token": "must-not-survive"}},
+            "items": [{"client_secret": "must-not-survive"}],
+            "virtual_lab": {},
+        }
+        with self.assertRaisesRegex(ValueError, "metadata.authentication.access_token"):
+            virtual_lab.reject_inline_secrets(spec)
+        shared = virtual_lab.spec_for_llm(spec)
+        self.assertNotIn("access_token", shared["metadata"]["authentication"])
+        self.assertNotIn("client_secret", shared["items"][0])
+
+    def test_final_results_remove_local_path_and_endpoint_before_llm(self) -> None:
+        shared = virtual_lab.results_for_llm(
+            {
+                "dataset": {"path": "/private/project/data.csv"},
+                "virtual_lab": {
+                    "base_url": "https://private-endpoint.example/v1",
+                    "credential_source": "PRIVATE_KEY_ENV",
+                },
+            },
+            "data.csv",
+        )
+        self.assertEqual(shared["dataset"]["path"], "data.csv")
+        self.assertNotIn("base_url", shared["virtual_lab"])
+        self.assertNotIn("credential_source", shared["virtual_lab"])
+
+    def test_base_url_rejects_embedded_credentials_and_query_secrets(self) -> None:
+        with self.assertRaisesRegex(ValueError, "embedded credentials"):
+            virtual_lab.validate_base_url("https://user:secret@example.test/v1/chat/completions")
+        with self.assertRaisesRegex(ValueError, "query string"):
+            virtual_lab.validate_base_url("https://example.test/v1/chat/completions?token=secret")
+
+    def test_non_retryable_http_error_is_not_retried(self) -> None:
+        client = virtual_lab.OpenAICompatibleClient(
+            "secret-value",
+            self.config("openai", "openai", "model", "https://example.test/v1/chat/completions"),
+        )
+        error = urllib.error.HTTPError(
+            "https://example.test/v1/chat/completions", 401, "Unauthorized", {}, None
+        )
+        with mock.patch("urllib.request.urlopen", side_effect=error) as request:
+            with self.assertRaisesRegex(RuntimeError, "non-retryable HTTP 401"):
+                client.complete(self.agent, self.messages, 0.2)
+        self.assertEqual(request.call_count, 1)
+
+    def test_auto_mode_requires_explicit_live_permission(self) -> None:
+        spec = {"virtual_lab": {"mode": "auto"}}
+        self.assertEqual(virtual_lab.resolve_mode(spec, None, True), "offline")
+        self.assertEqual(
+            virtual_lab.resolve_mode(spec, None, True, allow_live_auto=True), "live"
+        )
+
+    def test_analysis_plan_uses_structured_selection(self) -> None:
+        events = []
+        plan = virtual_lab.create_analysis_plan(
+            virtual_lab.OfflineClient(),
+            {"search": {"decision_method": "auto"}},
+            "No blockers.",
+            "Reject weighted sum; use achievement scalarization.",
+            events,
+        )
+        self.assertEqual(plan["decision_method"], "achievement_scalarization")
+        self.assertTrue(plan["model_families"])
+
+        class ConflictingClient:
+            def complete(self, agent, messages, temperature):
+                return SimpleNamespace(
+                    content=json.dumps(
+                        {
+                            "decision_method": "weighted_sum",
+                            "model_families": ["RandomForest"],
+                            "candidate_strategy": "latin_hypercube_plus_observed",
+                            "blocking_issues": [],
+                            "requires_human_approval": False,
+                            "rationale": "Conflict test.",
+                        }
+                    ),
+                    model="test",
+                    usage={},
+                )
+
+        with self.assertRaisesRegex(ValueError, "human-selected"):
+            virtual_lab.create_analysis_plan(
+                ConflictingClient(),
+                {"search": {"decision_method": "distance_to_expectation"}},
+                "summary",
+                "summary",
+                [],
+            )
 
     def test_generic_environment_key_is_supported_without_logging_value(self) -> None:
         config = self.config(

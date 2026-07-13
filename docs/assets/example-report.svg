@@ -9,32 +9,34 @@
     <text x="100" y="92" fill="#ffffff" font-size="30" font-weight="700">Virtual Lab Experiment</text>
     <text x="100" y="126" fill="#c9def8" font-size="18">synthetic_process_optimization · offline · deterministic example</text>
     <rect x="920" y="78" width="170" height="40" rx="20" fill="#d9f7e8"/>
-    <text x="1005" y="104" text-anchor="middle" fill="#176b43" font-size="16" font-weight="700">EXPECTATIONS MET</text>
+    <text x="1005" y="104" text-anchor="middle" fill="#176b43" font-size="15" font-weight="700">POINT CHECKS MET</text>
 
     <text x="100" y="205" fill="#18324f" font-size="22" font-weight="700">Selected parameters</text>
     <g font-size="17">
       <rect x="100" y="230" width="290" height="95" rx="12" fill="#eef5ff"/>
       <text x="125" y="263" fill="#52677f">Temperature</text>
-      <text x="125" y="301" fill="#123b72" font-size="28" font-weight="700">207.5 °C</text>
+      <text x="125" y="301" fill="#123b72" font-size="28" font-weight="700">215.0 °C</text>
       <rect x="455" y="230" width="290" height="95" rx="12" fill="#eef5ff"/>
       <text x="480" y="263" fill="#52677f">Pressure</text>
-      <text x="480" y="301" fill="#123b72" font-size="28" font-weight="700">1.01 MPa</text>
+      <text x="480" y="301" fill="#123b72" font-size="28" font-weight="700">1.50 MPa</text>
       <rect x="810" y="230" width="290" height="95" rx="12" fill="#eef5ff"/>
       <text x="835" y="263" fill="#52677f">Catalyst</text>
-      <text x="835" y="301" fill="#123b72" font-size="28" font-weight="700">1.99%</text>
+      <text x="835" y="301" fill="#123b72" font-size="28" font-weight="700">1.40%</text>
     </g>
 
     <text x="100" y="380" fill="#18324f" font-size="22" font-weight="700">Predicted targets</text>
-    <rect x="100" y="405" width="465" height="105" rx="12" fill="#f1fbf6" stroke="#bce8cf"/>
+    <rect x="100" y="405" width="465" height="105" rx="12" fill="#fff8e8" stroke="#efd08a"/>
     <text x="125" y="440" fill="#52677f" font-size="17">Yield · maximize · expected ≥ 80%</text>
-    <text x="125" y="483" fill="#176b43" font-size="30" font-weight="700">87.27%  ✓</text>
+    <text x="125" y="473" fill="#176b43" font-size="28" font-weight="700">84.00%  ✓</text>
+    <text x="125" y="498" fill="#8a5a16" font-size="14">Interval 79.06–88.94% · conservative check fails</text>
     <rect x="635" y="405" width="465" height="105" rx="12" fill="#f1fbf6" stroke="#bce8cf"/>
     <text x="660" y="440" fill="#52677f" font-size="17">Energy · minimize · expected ≤ 36 kWh</text>
-    <text x="660" y="483" fill="#176b43" font-size="30" font-weight="700">26.19 kWh  ✓</text>
+    <text x="660" y="473" fill="#176b43" font-size="28" font-weight="700">26.99 kWh  ✓</text>
+    <text x="660" y="498" fill="#176b43" font-size="14">Interval 24.22–29.75 kWh · conservative check passes</text>
 
     <text x="100" y="570" fill="#18324f" font-size="22" font-weight="700">Saved provenance</text>
-    <text x="100" y="607" fill="#52677f" font-size="17">✓ Agent roster and every conversation</text>
-    <text x="100" y="637" fill="#52677f" font-size="17">✓ Executed pipeline, stdout, stderr, metrics, Pareto front, and selected result</text>
+    <text x="100" y="607" fill="#52677f" font-size="17">✓ Agent roster, analysis plan, and every conversation</text>
+    <text x="100" y="637" fill="#52677f" font-size="17">✓ Verified pipeline, uncertainty, support checks, metrics, and selected result</text>
     <text x="100" y="667" fill="#52677f" font-size="17">✓ Machine-readable JSON/CSV artifacts and complete Markdown handoff</text>
     <text x="1095" y="690" text-anchor="end" fill="#8a5a16" font-size="15">Synthetic demonstration — requires real experimental confirmation</text>
   </g>

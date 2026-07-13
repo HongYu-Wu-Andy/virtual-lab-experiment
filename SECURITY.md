@@ -2,7 +2,7 @@
 
 ## Supported version
 
-Security fixes are applied to the latest release on `main` during the initial private-development phase.
+Security fixes are applied to the latest public release on `main`.
 
 ## Reporting a vulnerability
 
@@ -16,7 +16,7 @@ If a credential has been exposed, revoke and rotate it before reporting. Do not 
 - Keep API keys in environment variables and out of files and Git history.
 - Use a dedicated Python environment for dependencies.
 - Run untrusted forks or modified pipelines in a sandbox.
-- Review the generated pipeline and output paths before using results operationally.
+- Review the agent-authored analysis plan, verified executed pipeline, and output paths before using results operationally.
 - Treat all selected parameter sets as computational proposals requiring real experimental confirmation.
 - Do not use model output as a substitute for laboratory safety review, regulatory approval, or domain expert sign-off.
 

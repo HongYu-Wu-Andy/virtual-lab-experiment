@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Public beta](https://img.shields.io/badge/status-public%20beta-6f42c1)](CHANGELOG.md)
 
-Virtual Lab Experiment is a Codex plugin for reproducible, agent-led machine-learning experiments on numeric CSV or TSV datasets. Users choose the LLM provider and model that run the scientist team. The plugin conducts structured meetings, compares regression models, searches multi-objective candidates, and preserves every conversation, the executed code, terminal output, metrics, candidates, and final result.
+Virtual Lab Experiment is a Codex plugin for reproducible, agent-led machine-learning experiments on numeric CSV or TSV datasets. Users choose the LLM provider and model that run the scientist team. The plugin conducts structured meetings, converts the team consensus into a validated executable analysis plan, compares regression models, searches multi-objective candidates, and preserves every conversation, the verified executed code, terminal output, metrics, candidates, and final result.
 
 > [!IMPORTANT]
 > The selected parameters are a proposal for the next real experiment. Model predictions are not experimental validation, causal evidence, or a substitute for domain, safety, ethics, or regulatory review.
@@ -15,7 +15,7 @@ Virtual Lab Experiment is a Codex plugin for reproducible, agent-led machine-lea
 - Let a generated team of scientific agents critique the experiment and modeling plan.
 - Choose OpenAI, DeepSeek, Anthropic, Google Gemini, or another compatible provider.
 - Compare validated surrogate models and search a constrained multi-objective design space.
-- Keep a reproducible record of the full discussion, generated code, execution, and results.
+- Keep a reproducible record of the full discussion, agent-authored analysis plan, verified executed code, execution, and results.
 - Work without an API key in deterministic offline mode.
 
 ## How it works
@@ -24,33 +24,36 @@ Virtual Lab Experiment is a Codex plugin for reproducible, agent-led machine-lea
 flowchart LR
     A["Dataset + experiment specification"] --> B["Validation and dataset profile"]
     B --> C["Generated scientist team"]
-    C --> D["Independent meetings"]
+    C --> D["Individual analyses + independent team meetings"]
     D --> E["Scientific Critic + PI merge"]
-    E --> F["Model comparison and candidate search"]
-    F --> G["Pareto candidates + sensitivity analysis"]
-    G --> H["Complete report and Markdown handoff"]
-    H --> I["Human review and real experiment"]
-    I -. "new evidence" .-> A
+    E --> F["Validated analysis plan + human approval"]
+    F --> G["Model comparison and support-aware candidate search"]
+    G --> H["Pareto candidates + uncertainty and sensitivity"]
+    H --> I["Complete report and Markdown handoff"]
+    I --> L["Human review and real experiment"]
+    L -. "new evidence" .-> A
     J["Selected LLM provider"] --> C
     K["Environment variable or hidden key prompt"] --> J
 ```
 
-API credentials are used only by the selected provider client. They are never placed in the experiment specification, prompts, generated code, conversations, execution metadata, or reports.
+API credentials are used only by the selected provider client. Credential-like fields are rejected recursively and credential values are never placed in the experiment specification, prompts, executed code, conversations, execution metadata, or reports.
 
 ## What it does
 
 1. Validates the dataset, features, targets, directions, bounds, and constraints.
 2. Creates a Principal Investigator, Scientific Critic, domain scientist, experimental-design/statistics specialist, and machine-learning/optimization specialist.
-3. Runs independent meetings and a critic-assisted merge.
-4. Compares Random Forest, Extra Trees, Gradient Boosting, and scaled KNN for each target.
-5. Uses holdout validation plus grouped or shuffled cross-validation.
-6. Lets the agent discussion choose the multi-objective decision method when `decision_method` is `auto`; TOPSIS is not prescribed.
-7. Searches feasible candidates, computes a Pareto front, and performs weight-sensitivity analysis.
-8. Saves every agent message, the executed code, stdout and stderr, metrics, candidates, selected result, and a complete Markdown report.
+3. Runs individual specialist analyses, sequential independent team meetings, and a critic-assisted merge; each output becomes context for the next stage.
+4. Requires the PI to return a structured plan that controls the model families, candidate strategy, and decision method.
+5. Requires human approval before a live-agent plan is executed.
+6. Compares the plan-selected subset of Random Forest, Extra Trees, Gradient Boosting, and scaled KNN for each target.
+7. Uses grouped holdout and grouped cross-validation when groups or repeated feature settings exist.
+8. Lets the agent discussion choose the multi-objective decision method when `decision_method` is `auto`; no named method is preselected.
+9. Rejects multivariate out-of-support candidates and records residual-based screening intervals, a Pareto front, and weight sensitivity.
+10. Checkpoints every agent message and saves the verified executed code, stdout and stderr, metrics, candidates, selected result, and complete Markdown report—even retaining partial provenance on failure.
 
 ## Supported scope
 
-Version 0.2 supports numeric tabular regression in CSV and TSV files, with one or multiple targets and minimize, maximize, or target-value goals. Search stays inside observed or explicitly configured feature bounds.
+Version 0.3 supports numeric tabular regression in CSV and TSV files, with one or multiple targets and minimize, maximize, or target-value goals. Search stays inside observed or explicitly configured feature bounds and rejects candidates beyond an observed multivariate support-distance threshold.
 
 It does **not** silently claim support for classification, images, categorical variables, spectra requiring preprocessing, censored outcomes, time-series forecasting, causal inference, or row-wise algebraic constraints.
 
@@ -117,6 +120,8 @@ virtual-lab-experiment \
 
 `VIRTUAL_LAB_API_KEY` is a generic fallback. Never put a key in a JSON specification, command-line argument, chat message, tracked file, or issue. The runner records only the credential source label—not its value.
 
+Live runs save `analysis_plan.json` and require human approval before executing it. Review the plan interactively or pass `--approve-plan` only after reviewing it. `auto` mode remains offline unless `--allow-live-auto` explicitly permits use of a discovered credential. A non-default endpoint additionally requires `--allow-custom-endpoint` after its host is trusted.
+
 List the adapters with:
 
 ```bash
@@ -132,16 +137,17 @@ virtual-lab-experiment \
   --quick
 ```
 
-An illustrative run selected approximately 207.5 °C, 1.01 MPa, and 1.99% catalyst, predicting 87.27% yield and 26.19 kWh. Both configured expectations were predicted to pass. These values demonstrate the software contract only; they come from synthetic data and are not scientific findings.
+An illustrative run selected approximately 215.0 °C, 1.50 MPa, and 1.40% catalyst, predicting 84.00% yield and 26.99 kWh. Both point predictions passed their configured expectations, but the support-adjusted residual screening intervals were approximately 79.06–88.94% and 24.22–29.75 kWh, so the yield expectation did not pass conservatively. These values demonstrate the software contract only; they come from synthetic data and are not scientific findings.
 
 ![Example Virtual Lab report showing the selected synthetic parameters, predicted targets, and saved provenance](docs/assets/example-report.png)
 
 The timestamped run directory contains:
 
 - `agents.json`
+- `analysis_plan.json`
 - `conversations.json` and `conversations.md`
 - `dataset_profile.json` and the resolved `experiment_spec.json`
-- `generated_pipeline.py`
+- `executed_pipeline.py`
 - `execution.json` with stdout and stderr
 - `results/metrics.csv`
 - `results/pareto_front.csv`
@@ -155,8 +161,8 @@ Use `--handoff-dir` or `handoff_directory` to copy the complete `.md` report int
 - `.codex-plugin/plugin.json` — plugin identity and install metadata.
 - `.agents/plugins/marketplace.json` — Codex marketplace entry.
 - `skills/run-virtual-lab-experiment/SKILL.md` — workflow and scientific guardrails.
-- `run_virtual_lab.py` — agent generation, meetings, orchestration, execution, and reporting.
-- `pipeline_core.py` — dataset validation, model comparison, Pareto search, and final selection.
+- `run_virtual_lab.py` — agent generation, individual/team meetings, structured plan approval, failure-safe orchestration, provider clients, execution, and reporting.
+- `pipeline_core.py` — strict dataset/spec validation, grouped model comparison, support-aware candidate search, uncertainty-aware Pareto analysis, and final selection.
 - `examples/` — synthetic dataset and runnable experiment specification.
 - `tests/` — end-to-end, provider, packaging, and repository-hygiene tests.
 - `.github/` — CI, dependency updates, and collaboration templates.

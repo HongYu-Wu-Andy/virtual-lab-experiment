@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 — 2026-07-12
+
+- Made agent deliberation operational through a structured, validated analysis plan controlling model families, candidate strategy, and decision method.
+- Added explicit human approval for live plans, opt-in live `auto` mode, and explicit trust approval for custom endpoints.
+- Replaced keyword decision parsing with strict structured selection and removed silent decision-method fallback.
+- Added recursive credential rejection and redaction, safer endpoint validation, sanitized provider errors, and transient-only HTTP retries.
+- Added grouped holdout validation, repeated-setting leakage protection, finite numeric-contract enforcement, and failure on non-finite metrics.
+- Added Latin-hypercube search, multivariate support-distance screening, residual-quantile screening intervals, and uncertainty-aware objectives.
+- Renamed copied `generated_pipeline.py` to the accurate `executed_pipeline.py` and documented the agent-authored `analysis_plan.json` separately.
+- Added immediate conversation checkpointing plus failure reports and partial provenance for interrupted or unsuccessful runs.
+- Expanded adversarial, scientific-safeguard, provider, failure-path, and end-to-end tests.
+
 ## 0.2.2 — 2026-07-12
 
 - Updated the repository owner, package links, plugin marketplace source, installation command, CI badge, security URLs, and citation metadata to `WUHYA`.

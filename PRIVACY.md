@@ -16,7 +16,7 @@ Live mode sends the following material to the provider selected by the user:
 - model results and candidate-selection summaries;
 - meeting prompts and prior agent responses.
 
-The runner does not send raw dataset rows. It removes absolute dataset, output, handoff, endpoint, and credential-variable details from the LLM context. The selected provider processes submitted material under its own terms and privacy policy.
+The runner does not send raw dataset rows. It removes absolute dataset, output, handoff, endpoint, and credential-variable details from the LLM context, including the final-review result summary. The selected provider processes submitted material under its own terms and privacy policy.
 
 Do not use live mode with confidential, regulated, export-controlled, personal, or commercially sensitive data unless the user or organization has approved that provider and data flow. Use offline mode when external processing is not permitted.
 
@@ -36,7 +36,9 @@ Review artifacts before sharing them. The optional Markdown handoff remains unde
 
 Live mode reads the configured provider environment variable, `VIRTUAL_LAB_API_KEY`, or a hidden interactive prompt. Supported defaults are `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, and `GEMINI_API_KEY`.
 
-The runner rejects inline `api_key`, `token`, `secret`, and `password` fields. Credential values are not written to the experiment specification, report, conversation log, execution metadata, or result files. Artifacts record only the provider, model, endpoint, and credential source label.
+The runner recursively rejects credential-like fields at any nesting level. Credential values are not written to the experiment specification, report, conversation log, execution metadata, or result files. Artifacts record only the provider, model, endpoint, and credential source label. Provider errors are sanitized before persistence.
+
+`auto` mode remains offline unless the user explicitly enables live auto-selection. Live runs require approval of the saved analysis plan, and custom endpoints require separate trust confirmation before receiving a credential.
 
 ## Public repository
 
