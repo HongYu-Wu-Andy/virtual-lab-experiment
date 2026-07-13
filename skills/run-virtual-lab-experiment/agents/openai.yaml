@@ -1,4 +1,4 @@
 interface:
   display_name: "Virtual Lab Experiment"
-  short_description: "Run agent-led ML experiments with full provenance"
-  default_prompt: "Use $run-virtual-lab-experiment with my chosen provider and model to analyze my dataset and record all conversations, code, and outputs."
+  short_description: "Run human-approved agent-led ML experiments"
+  default_prompt: "Use $run-virtual-lab-experiment to analyze my numeric dataset with my chosen provider and model, let me approve the analysis plan, and preserve the full audit trail."

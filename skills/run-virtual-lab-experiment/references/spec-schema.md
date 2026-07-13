@@ -88,11 +88,13 @@ Row-wise algebraic constraints are not supported in version 1. Encode derived fe
 
 `search`:
 
-- `candidate_count`: random continuous candidates inside bounds; default 10,000.
+- `candidate_count`: continuous candidates inside bounds before support screening; default 10,000.
 - `decision_method`: `auto`, `achievement_scalarization`, `weighted_sum`, or `distance_to_expectation`.
 - `sensitivity_samples`: number of random weight vectors; default 300.
+- `model_families`: optional subset of `RandomForest`, `ExtraTrees`, `GradientBoosting`, and `KNN`; the live analysis plan supplies this when omitted.
+- `candidate_strategy`: `latin_hypercube_plus_observed` or `random_uniform_plus_observed`; the live analysis plan supplies this when omitted.
 
-When `decision_method` is `auto`, the Agent discussion chooses a method. If the choice cannot be parsed or executed safely, the runner records and uses `achievement_scalarization` as the verified fallback.
+When `decision_method` is `auto`, the Agent discussion chooses a method through structured `analysis_plan.json`. Unsupported, malformed, or contradictory plans fail explicitly; the runner never infers a choice from keyword mentions and never silently substitutes another method.
 
 ## Virtual Lab settings
 
@@ -103,10 +105,10 @@ When `decision_method` is `auto`, the Agent discussion chooses a method. If the 
 - `model`: exact model identifier accepted by the selected provider.
 - `api_key_env`: optional environment-variable name containing the key.
 - `base_url`: optional provider endpoint override; required for `openai_compatible`.
-- `parallel_runs`: independent creative meetings; default 3.
+- `independent_runs`: sequential independent creative meetings; default 3.
 - `meeting_rounds`: specialist discussion rounds; default 2.
 
-Default credential variables are `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, and `GEMINI_API_KEY`. `VIRTUAL_LAB_API_KEY` is a provider-independent fallback. `auto` uses live agents when a configured credential is available and otherwise uses a clearly labeled deterministic offline team.
+Default credential variables are `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, and `GEMINI_API_KEY`. `VIRTUAL_LAB_API_KEY` is a provider-independent fallback. `auto` remains offline unless `--allow-live-auto` explicitly authorizes use of a discovered credential. Live runs require interactive analysis-plan approval or `--approve-plan` after review.
 
 Use `openai_compatible` for providers exposing a compatible Chat Completions endpoint:
 
@@ -120,7 +122,7 @@ Use `openai_compatible` for providers exposing a compatible Chat Completions end
 }
 ```
 
-Never add an `api_key`, `token`, `secret`, or `password` field. The runner rejects inline credentials. For interactive entry, run with `--prompt-api-key`; the input is hidden and not persisted.
+Never add an `api_key`, `token`, `secret`, or `password` field at any nesting level. The runner rejects credential-like fields recursively. For interactive entry, run with `--prompt-api-key`; the input is hidden and not persisted. Custom endpoints must use HTTPS, contain no embedded credentials, query, or fragment, and require `--allow-custom-endpoint` in live mode after the host is reviewed.
 
 ## Output settings
 

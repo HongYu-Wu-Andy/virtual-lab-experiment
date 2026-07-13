@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it and the research that inspired the workflow."
 title: "Virtual Lab Experiment"
 type: software
-version: 0.2.2
+version: 0.3.0
 date-released: 2026-07-12
 authors:
   - family-names: Wu

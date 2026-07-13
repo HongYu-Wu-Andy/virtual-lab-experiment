@@ -1,6 +1,6 @@
 ---
 name: run-virtual-lab-experiment
-description: Run an agent-led Virtual Lab for numeric tabular experiment datasets with a user-selected LLM provider and model, automatically creating domain-specific scientist agents, conducting and merging research meetings, training and validating multi-target regression models, searching parameter candidates, and recording every conversation, generated code, execution output, metric, Pareto candidate, and final result. Use when a user provides a CSV/TSV dataset and asks to optimize parameters, build an ML surrogate, create a digital/virtual laboratory, choose an AI provider/model, or save a reproducible Markdown experiment handoff.
+description: Run an agent-led Virtual Lab for numeric tabular experiment datasets with a user-selected LLM provider and model, automatically creating domain-specific scientist agents, conducting and merging research meetings, compiling the team consensus into a human-approved analysis plan, training and validating multi-target regression models, searching support-aware parameter candidates, and recording every conversation, plan, verified executed code, execution output, metric, Pareto candidate, uncertainty estimate, and final result. Use when a user provides a CSV/TSV dataset and asks to optimize parameters, build an ML surrogate, create a digital/virtual laboratory, choose an AI provider/model, or save a reproducible Markdown experiment handoff.
 ---
 
 # Run Virtual Lab Experiment
@@ -22,6 +22,7 @@ Obtain or infer these inputs:
 9. Output directory and optional Markdown handoff directory.
 10. Live-mode provider and exact model identifier.
 11. Credential method: provider environment variable, `VIRTUAL_LAB_API_KEY`, or hidden interactive prompt.
+12. Explicit approval of the live analysis plan and, when applicable, the custom provider endpoint.
 
 Inspect the dataset before asking questions. Ask only for missing choices that materially change the experiment. Do not guess target directions, units, or safety-critical constraints.
 
@@ -43,9 +44,9 @@ The scripts require Python 3.11+, NumPy, pandas, and scikit-learn.
 
 Before execution, check imports with the intended interpreter. If missing, use `scripts/requirements.txt` to create or update an isolated environment. Request approval before downloading dependencies when the environment requires it.
 
-Never ask the user to place an API key in the spec, command line, chat transcript, or a tracked file. Accept credentials through the provider environment variable, `VIRTUAL_LAB_API_KEY`, or `--prompt-api-key`. If a user pastes a key into chat, do not repeat it; recommend revocation and replacement.
+Never ask the user to place an API key in the spec, command line, chat transcript, or a tracked file. Accept credentials through the provider environment variable, `VIRTUAL_LAB_API_KEY`, or `--prompt-api-key`. The runner recursively rejects credential-like fields. If a user pastes a key into chat, do not repeat it; recommend revocation and replacement.
 
-Supported native providers are `openai`, `deepseek`, `anthropic`, and `google`. Use `openai_compatible` with an HTTPS `base_url` for other providers exposing a Chat Completions-compatible endpoint. Read [references/spec-schema.md](references/spec-schema.md) for provider fields and default environment-variable names.
+Supported native providers are `openai`, `deepseek`, `anthropic`, and `google`. Use `openai_compatible` with an HTTPS `base_url` for other providers exposing a Chat Completions-compatible endpoint. Review a custom endpoint before passing `--allow-custom-endpoint`; never approve a URL containing credentials, a query string, or a fragment. Read [references/spec-schema.md](references/spec-schema.md) for provider fields and default environment-variable names.
 
 ## Run the Virtual Lab
 
@@ -63,7 +64,7 @@ python scripts/run_virtual_lab.py --spec experiment_spec.json --mode live
 
 ```bash
 python scripts/run_virtual_lab.py --spec experiment_spec.json --mode live \
-  --provider openai --model YOUR_MODEL --prompt-api-key
+  --provider openai --model YOUR_MODEL --prompt-api-key --approve-plan
 ```
 
 ```bash
@@ -78,8 +79,8 @@ Resolve script paths relative to this skill directory. Do not copy the skill's s
 
 ## Understand execution modes
 
-- `auto`: use live agents when the configured provider key is available; otherwise use offline mode.
-- `live`: use the selected provider/model to generate three experiment-specific scientist agents, run creative meetings, merge them with criticism, choose a decision method, and review the executed result.
+- `auto`: remain offline by default; use a discovered provider key only when the user explicitly authorizes `--allow-live-auto`.
+- `live`: use the selected provider/model to generate three experiment-specific scientist agents, run individual analyses followed by independent team meetings, merge them with criticism, create a structured analysis plan, obtain human approval, and review the executed result.
 - `offline`: create a clearly labeled deterministic team and use the verified generic pipeline. Use for testing and reproducibility, not as evidence of independent LLM deliberation.
 
 The generated scientist team contains:
@@ -102,10 +103,11 @@ Confirm:
 5. Holdout and CV metrics are finite and plausible.
 6. `expectation_checks` are reported for every expected range.
 7. Decision weights and sensitivity are recorded.
-8. `conversations.json`, `generated_pipeline.py`, and `execution.json` exist.
+8. `analysis_plan.json`, `conversations.json`, `executed_pipeline.py`, and `execution.json` exist.
 9. `virtual_lab_report.md` contains conversations, code, output, results, and limitations.
-10. Any requested Markdown handoff copy exists.
-11. Provider and model metadata match the requested configuration, and no credential value appears in any artifact.
+10. Prediction intervals, support distance, and the support threshold are recorded.
+11. Any requested Markdown handoff copy exists.
+12. Provider and model metadata match the requested configuration, and no credential value appears in any artifact.
 
 If validation fails, report the exact failure and retain partial artifacts. Do not summarize a failed run as successful.
 
@@ -115,17 +117,17 @@ Lead with:
 
 - selected feature/parameter values;
 - predicted targets;
-- whether each expectation is predicted to pass;
+- whether each point prediction and complete screening interval passes its expectation;
 - model/CV quality;
 - decision sensitivity;
 - run mode (`live` or `offline`);
 - required real-world confirmation.
 
-Link the report and the run directory. Mention that the report contains every Agent turn, the executed code, stdout/stderr, metrics, Pareto front, and machine-readable result.
+Link the report and the run directory. Mention that the report contains every Agent turn, the agent-authored analysis plan, verified executed code, stdout/stderr, metrics, Pareto front, uncertainty and support checks, and machine-readable result.
 
 ## Supported scope
 
-Version 1 supports:
+Version 0.3 supports:
 
 - CSV/TSV input;
 - numeric features;
@@ -134,6 +136,7 @@ Version 1 supports:
 - minimize, maximize, or target-value goals;
 - box constraints on individual features;
 - random or grouped cross-validation;
-- continuous candidate sampling inside observed/configured bounds.
+- Latin-hypercube or random candidate sampling inside observed/configured bounds;
+- multivariate support-distance screening and residual-quantile screening intervals.
 
 Do not silently apply it to classification, images, spectra requiring preprocessing, censored outcomes, time-series forecasting, causal inference, or row-wise algebraic constraints. Either preprocess/extend with explicit validation or explain the limitation.

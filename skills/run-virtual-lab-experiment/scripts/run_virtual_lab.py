@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -146,14 +147,28 @@ class HTTPClient:
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(request, timeout=300) as response:
+                with urllib.request.urlopen(request, timeout=120) as response:
                     return json.loads(response.read().decode("utf-8"))
-            except (urllib.error.URLError, urllib.error.HTTPError, ValueError, RuntimeError) as exc:
+            except urllib.error.HTTPError as exc:
+                last_error = exc
+                retryable = exc.code in {408, 409, 425, 429} or 500 <= exc.code < 600
+                if not retryable:
+                    raise RuntimeError(
+                        f"{self.config.provider} API returned non-retryable HTTP {exc.code}"
+                    ) from exc
+                if attempt >= 3:
+                    break
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                delay = float(retry_after) if retry_after and retry_after.isdigit() else 2**attempt + random.random()
+                time.sleep(min(delay, 15.0))
+            except (urllib.error.URLError, TimeoutError, ValueError, RuntimeError) as exc:
                 last_error = exc
                 if attempt >= 3:
                     break
                 time.sleep(min(2**attempt + random.random(), 15.0))
-        raise RuntimeError(f"{self.config.provider} API call failed: {last_error}")
+        raise RuntimeError(
+            f"{self.config.provider} API call failed after retries: {type(last_error).__name__}"
+        ) from last_error
 
 
 class OpenAICompatibleClient(HTTPClient):
@@ -297,6 +312,22 @@ class OfflineClient:
                     ]
                 }
             )
+        elif "[ANALYSIS_PLAN_JSON]" in transcript:
+            content = json.dumps(
+                {
+                    "decision_method": "achievement_scalarization",
+                    "model_families": [
+                        "RandomForest",
+                        "ExtraTrees",
+                        "GradientBoosting",
+                        "KNN",
+                    ],
+                    "candidate_strategy": "latin_hypercube_plus_observed",
+                    "blocking_issues": [],
+                    "requires_human_approval": False,
+                    "rationale": "Use diverse fixed surrogate families, space-filling candidate search, and a non-compensatory multi-target compromise with weight sensitivity.",
+                }
+            )
         elif "[MODEL_AND_DECISION]" in transcript:
             if "Machine Learning" in agent.title:
                 content = (
@@ -370,7 +401,20 @@ def safe_name(value: str) -> str:
 
 def spec_for_llm(spec: dict[str, Any]) -> dict[str, Any]:
     """Remove unnecessary local path details before sending context to an LLM."""
-    shared = json.loads(json.dumps(spec))
+    def sanitized(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: sanitized(item)
+                for key, item in value.items()
+                if not is_credential_key(str(key))
+                and str(key).strip().lower().replace("-", "_")
+                not in {"api_key_env", "base_url"}
+            }
+        if isinstance(value, list):
+            return [sanitized(item) for item in value]
+        return value
+
+    shared = sanitized(json.loads(json.dumps(spec)))
     dataset = shared.get("dataset") or {}
     if dataset.get("path"):
         dataset["path"] = Path(str(dataset["path"])).name
@@ -382,20 +426,70 @@ def spec_for_llm(spec: dict[str, Any]) -> dict[str, Any]:
     settings = shared.get("virtual_lab") or {}
     settings.pop("api_key_env", None)
     settings.pop("base_url", None)
-    for forbidden in ("api_key", "token", "secret", "password"):
-        settings.pop(forbidden, None)
     return shared
 
 
+def results_for_llm(results: dict[str, Any], dataset_name: str) -> dict[str, Any]:
+    shared = json.loads(json.dumps(results))
+    if (shared.get("dataset") or {}).get("path"):
+        shared["dataset"]["path"] = dataset_name
+    settings = shared.get("virtual_lab") or {}
+    settings.pop("base_url", None)
+    settings.pop("credential_source", None)
+    return shared
+
+
+def is_credential_key(key: str) -> bool:
+    normalized = key.strip().lower().replace("-", "_")
+    exact = {
+        "api_key",
+        "access_token",
+        "access_key",
+        "authorization",
+        "auth_token",
+        "bearer_token",
+        "client_secret",
+        "credential",
+        "credentials",
+        "password",
+        "private_key",
+        "refresh_token",
+        "secret",
+        "token",
+    }
+    return normalized in exact or normalized.endswith(
+        (
+            "_api_key",
+            "_access_key",
+            "_access_token",
+            "_auth_token",
+            "_client_secret",
+            "_password",
+            "_private_key",
+            "_refresh_token",
+        )
+    )
+
+
 def reject_inline_secrets(spec: dict[str, Any]) -> None:
-    settings = spec.get("virtual_lab") or {}
-    forbidden = [
-        key for key in ("api_key", "token", "secret", "password") if settings.get(key)
-    ]
+    forbidden: list[str] = []
+
+    def inspect(value: Any, path: str) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                child = f"{path}.{key}" if path else str(key)
+                if is_credential_key(str(key)) and item not in (None, "", False):
+                    forbidden.append(child)
+                inspect(item, child)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                inspect(item, f"{path}[{index}]")
+
+    inspect(spec, "")
     if forbidden:
         raise ValueError(
             "Never store credentials in experiment_spec.json. Remove "
-            + ", ".join(forbidden)
+            + ", ".join(sorted(forbidden))
             + " and use an environment variable or --prompt-api-key."
         )
 
@@ -412,6 +506,10 @@ def validate_base_url(value: str) -> str:
         raise ValueError("Provider base_url must use HTTPS, except for an HTTP loopback endpoint")
     if not parsed.netloc:
         raise ValueError("Provider base_url must be an absolute URL")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("Provider base_url must not contain embedded credentials")
+    if parsed.query or parsed.fragment:
+        raise ValueError("Provider base_url must not contain a query string or fragment")
     return value
 
 
@@ -480,6 +578,11 @@ def resolve_api_key(config: ProviderConfig, prompt: bool) -> tuple[str | None, s
     return None, None
 
 
+def uses_custom_endpoint(config: ProviderConfig) -> bool:
+    default = PROVIDER_DEFAULTS[config.provider].get("base_url")
+    return default is None or config.base_url.rstrip("/") != str(default).rstrip("/")
+
+
 def build_client(config: ProviderConfig, api_key: str):
     if config.api_style == "anthropic":
         return AnthropicClient(api_key, config)
@@ -488,10 +591,15 @@ def build_client(config: ProviderConfig, api_key: str):
     return OpenAICompatibleClient(api_key, config)
 
 
-def resolve_mode(spec: dict[str, Any], override: str | None, has_api_key: bool) -> str:
-    mode = override or (spec.get("virtual_lab") or {}).get("mode", "auto")
+def resolve_mode(
+    spec: dict[str, Any],
+    override: str | None,
+    has_api_key: bool,
+    allow_live_auto: bool = False,
+) -> str:
+    mode = override or (spec.get("virtual_lab") or {}).get("mode", "offline")
     if mode == "auto":
-        return "live" if has_api_key else "offline"
+        return "live" if has_api_key and allow_live_auto else "offline"
     if mode not in {"live", "offline"}:
         raise ValueError("Virtual Lab mode must be auto, live, or offline")
     return mode
@@ -622,7 +730,40 @@ def team_meeting(
     )
 
 
-def parallel_and_merge(
+def individual_meeting(
+    client,
+    name: str,
+    task: str,
+    agent: Agent,
+    temperature: float,
+    events: list[dict[str, Any]],
+) -> str:
+    history: list[dict[str, str]] = []
+    context = (
+        f"Individual meeting: {name}\nTask:\n{task}\n\nWork only from your assigned expertise. "
+        "Separate evidence, assumptions, blockers, and recommendations. Do not simulate other agents."
+    )
+    history.append({"role": "user", "name": "HumanResearcher", "content": context})
+    events.append(
+        {
+            "meeting": name,
+            "speaker": "Human Researcher",
+            "kind": "agenda",
+            "message": context,
+        }
+    )
+    return ask(
+        client,
+        agent,
+        history,
+        events,
+        name,
+        f"{agent.title}, return your individual analysis for the later team meeting.",
+        temperature,
+    )
+
+
+def independent_and_merge(
     client,
     phase: str,
     agenda: str,
@@ -662,16 +803,83 @@ def parallel_and_merge(
     ) or initial
 
 
-def choose_decision_method(spec: dict[str, Any], discussion: str) -> str:
-    configured = str((spec.get("search") or {}).get("decision_method", "auto"))
-    if configured != "auto":
-        return configured
-    lowered = discussion.lower()
-    if "weighted sum" in lowered or "weighted_sum" in lowered:
-        return "weighted_sum"
-    if "distance to expectation" in lowered or "distance_to_expectation" in lowered:
-        return "distance_to_expectation"
-    return "achievement_scalarization"
+def create_analysis_plan(
+    client,
+    spec: dict[str, Any],
+    specification_summary: str,
+    method_summary: str,
+    events: list[dict[str, Any]],
+) -> dict[str, Any]:
+    configured_method = str((spec.get("search") or {}).get("decision_method", "auto"))
+    prompt = (
+        "[ANALYSIS_PLAN_JSON] Convert the completed scientific discussion into one executable plan. "
+        "Return JSON only with decision_method, model_families, candidate_strategy, blocking_issues, "
+        "requires_human_approval, and rationale. decision_method must be one of "
+        "achievement_scalarization, weighted_sum, or distance_to_expectation. model_families must be a "
+        "non-empty subset of RandomForest, ExtraTrees, GradientBoosting, and KNN. candidate_strategy must "
+        "be latin_hypercube_plus_observed or random_uniform_plus_observed. Do not select a method merely "
+        "because it was mentioned; use the team's final recommendation. List every unresolved scientific "
+        "blocker explicitly. The configured method is "
+        f"{configured_method!r}; when it is not 'auto', preserve that explicit human choice.\n\n"
+        f"Specification discussion:\n{specification_summary}\n\nMethod discussion:\n{method_summary}"
+    )
+    history = [{"role": "user", "name": "HumanResearcher", "content": prompt}]
+    events.append(
+        {
+            "meeting": "analysis_plan",
+            "speaker": "Human Researcher",
+            "kind": "prompt",
+            "message": prompt,
+        }
+    )
+    completion = client.complete(PI, history, 0.0)
+    events.append(
+        {
+            "meeting": "analysis_plan",
+            "speaker": PI.title,
+            "kind": "response",
+            "message": completion.content,
+            "model": completion.model,
+            "usage": completion.usage,
+        }
+    )
+    plan = parse_json_response(completion.content)
+    allowed_methods = {
+        "achievement_scalarization",
+        "weighted_sum",
+        "distance_to_expectation",
+    }
+    method = str(plan.get("decision_method", ""))
+    if method not in allowed_methods:
+        raise ValueError(f"Agent analysis plan selected unsupported decision method: {method!r}")
+    if configured_method != "auto" and method != configured_method:
+        raise ValueError("Agent analysis plan did not preserve the human-selected decision method")
+    supported_models = {"RandomForest", "ExtraTrees", "GradientBoosting", "KNN"}
+    model_families = plan.get("model_families")
+    if (
+        not isinstance(model_families, list)
+        or not model_families
+        or len(set(model_families)) != len(model_families)
+        or not set(model_families) <= supported_models
+    ):
+        raise ValueError("Agent analysis plan contains invalid model_families")
+    strategy = str(plan.get("candidate_strategy", ""))
+    if strategy not in {"latin_hypercube_plus_observed", "random_uniform_plus_observed"}:
+        raise ValueError(f"Agent analysis plan selected unsupported candidate strategy: {strategy!r}")
+    blockers = plan.get("blocking_issues", [])
+    if not isinstance(blockers, list) or not all(isinstance(item, str) for item in blockers):
+        raise ValueError("Agent analysis plan blocking_issues must be a list of strings")
+    rationale = str(plan.get("rationale", "")).strip()
+    if not rationale:
+        raise ValueError("Agent analysis plan requires a rationale")
+    return {
+        "decision_method": method,
+        "model_families": model_families,
+        "candidate_strategy": strategy,
+        "blocking_issues": blockers,
+        "requires_human_approval": bool(plan.get("requires_human_approval", False) or blockers),
+        "rationale": rationale,
+    }
 
 
 def conversation_markdown(events: list[dict[str, Any]]) -> str:
@@ -683,6 +891,64 @@ def conversation_markdown(events: list[dict[str, Any]]) -> str:
             lines.extend([f"## {current}", ""])
         lines.extend([f"### {event['speaker']}", "", str(event["message"]), ""])
     return "\n".join(lines)
+
+
+def write_json(path: Path, value: Any) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(value, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    temporary.replace(path)
+
+
+class AuditLog(list[dict[str, Any]]):
+    """Persist every conversation turn immediately so failures retain provenance."""
+
+    def __init__(self, run_dir: Path) -> None:
+        super().__init__()
+        self.run_dir = run_dir
+        self.checkpoint()
+
+    def append(self, event: dict[str, Any]) -> None:
+        super().append(event)
+        self.checkpoint()
+
+    def checkpoint(self) -> None:
+        write_json(self.run_dir / "conversations.json", self)
+        (self.run_dir / "conversations.md").write_text(
+            conversation_markdown(self), encoding="utf-8"
+        )
+
+
+def write_failure_artifacts(
+    run_dir: Path,
+    run_id: str,
+    spec: dict[str, Any],
+    mode: str,
+    error: BaseException,
+) -> None:
+    failure = {
+        "status": "failed",
+        "run_id": run_id,
+        "mode": mode,
+        "error_type": type(error).__name__,
+        "message": str(error),
+        "traceback": traceback.format_exc(),
+    }
+    write_json(run_dir / "failure.json", failure)
+    report = "\n".join(
+        [
+            f"# Failed Virtual Lab Run: {spec.get('experiment_name', 'experiment')}",
+            "",
+            f"**Run:** `{run_id}`",
+            f"**Mode:** `{mode}`",
+            f"**Error:** `{type(error).__name__}: {error}`",
+            "",
+            "The run did not produce an accepted scientific result. Partial conversations and artifacts "
+            "were retained for diagnosis. Do not treat any partial prediction as a result.",
+        ]
+    )
+    (run_dir / "failure_report.md").write_text(report, encoding="utf-8")
 
 
 def report_markdown(
@@ -711,7 +977,8 @@ def report_markdown(
             f"**Model:** `{results.get('virtual_lab', {}).get('model', 'offline-deterministic')}`",
             f"**Description:** {spec['description']}",
             f"**Decision method:** `{results['decision_method']}`",
-            f"**Predicted expectations met:** `{results['selected']['expectations_met']}`",
+            f"**Point-prediction expectations met:** `{results['selected']['expectations_met']}`",
+            f"**Screening-interval expectations met:** `{results['selected'].get('conservative_expectations_met')}`",
             "",
             "## Experiment specification",
             "",
@@ -726,7 +993,7 @@ def report_markdown(
             "```",
             "",
             conversation_markdown(events),
-            "## Generated and executed ML code",
+            "## Verified executed ML code",
             "",
             "```python",
             code.rstrip(),
@@ -759,6 +1026,21 @@ def main() -> None:
     parser.add_argument("--base-url")
     parser.add_argument("--api-key-env")
     parser.add_argument("--prompt-api-key", action="store_true")
+    parser.add_argument(
+        "--allow-live-auto",
+        action="store_true",
+        help="allow auto mode to use a discovered API key and contact the provider",
+    )
+    parser.add_argument(
+        "--allow-custom-endpoint",
+        action="store_true",
+        help="confirm that a non-default provider endpoint is trusted to receive the API key",
+    )
+    parser.add_argument(
+        "--approve-plan",
+        action="store_true",
+        help="approve the saved live-agent analysis plan without an interactive prompt",
+    )
     parser.add_argument("--list-providers", action="store_true")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument(
@@ -789,26 +1071,32 @@ def main() -> None:
             "api_key_env": provider_config.api_key_env,
         }
     )
-    requested_mode = args.mode or settings.get("mode", "auto")
+    requested_mode = args.mode or settings.get("mode", "offline")
     api_key, credential_source = resolve_api_key(
         provider_config,
         prompt=args.prompt_api_key and requested_mode != "offline",
     )
-    mode = resolve_mode(spec, args.mode, bool(api_key))
+    mode = resolve_mode(spec, args.mode, bool(api_key), args.allow_live_auto)
     if mode == "live":
         if not api_key:
             raise RuntimeError(
                 f"Live mode requires {provider_config.api_key_env}, "
                 "VIRTUAL_LAB_API_KEY, or --prompt-api-key"
             )
+        if uses_custom_endpoint(provider_config) and not args.allow_custom_endpoint:
+            raise RuntimeError(
+                "Live mode with a custom endpoint requires --allow-custom-endpoint after the host is reviewed"
+            )
         client = build_client(provider_config, api_key)
     else:
         client = OfflineClient()
 
-    runs = 1 if args.quick else int(settings.get("parallel_runs", 3))
+    runs = 1 if args.quick else int(
+        settings.get("independent_runs", settings.get("parallel_runs", 3))
+    )
     rounds = 1 if args.quick else int(settings.get("meeting_rounds", 2))
-    if runs < 1 or rounds < 1:
-        raise ValueError("parallel_runs and meeting_rounds must be at least one")
+    if not 1 <= runs <= 10 or not 1 <= rounds <= 10:
+        raise ValueError("independent_runs and meeting_rounds must be between one and ten")
     if args.quick:
         spec.setdefault("search", {})["candidate_count"] = min(
             int(spec.get("search", {}).get("candidate_count", 10_000)), 1_000
@@ -821,170 +1109,224 @@ def main() -> None:
     root = root_value.expanduser()
     if not root.is_absolute():
         root = spec_path.parent / root
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     run_dir = root.resolve() / safe_name(spec["experiment_name"]) / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
     result_dir = run_dir / "results"
+    events: AuditLog = AuditLog(run_dir)
+    try:
+        shared_spec = spec_for_llm(spec)
+        agents = generate_agents(client, shared_spec, events)
+        write_json(run_dir / "agents.json", [asdict(agent) for agent in agents])
 
-    events: list[dict[str, Any]] = []
-    shared_spec = spec_for_llm(spec)
-    agents = generate_agents(client, shared_spec, events)
-    (run_dir / "agents.json").write_text(
-        json.dumps([asdict(agent) for agent in agents], indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+        original_validated = pipeline_core.load_spec(spec_path)
+        data_path = pipeline_core.dataset_path(spec_path, original_validated)
+        data = pipeline_core.validate_dataset(
+            pipeline_core.read_dataset(data_path), original_validated
+        )
+        feature_names = [item["name"] for item in spec["features"]]
+        target_names = [item["name"] for item in spec["targets"]]
+        profile = {
+            "path": str(data_path),
+            "shape": list(data.shape),
+            "features": feature_names,
+            "targets": target_names,
+            "missing_values": int(data.isna().sum().sum()),
+            "duplicate_rows": int(data.duplicated().sum()),
+            "duplicate_feature_settings": int(
+                data.duplicated(subset=feature_names, keep=False).sum()
+            ),
+            "summary": data[feature_names + target_names].describe().to_dict(),
+            "spearman": data[feature_names + target_names].corr(method="spearman").to_dict(),
+        }
+        write_json(run_dir / "dataset_profile.json", profile)
 
-    data_path = pipeline_core.dataset_path(spec_path, pipeline_core.load_spec(spec_path))
-    data = pipeline_core.validate_dataset(
-        pipeline_core.read_dataset(data_path), pipeline_core.load_spec(spec_path)
-    )
-    feature_names = [item["name"] for item in spec["features"]]
-    target_names = [item["name"] for item in spec["targets"]]
-    profile = {
-        "path": str(data_path),
-        "shape": list(data.shape),
-        "features": feature_names,
-        "targets": target_names,
-        "missing_values": int(data.isna().sum().sum()),
-        "duplicate_rows": int(data.duplicated().sum()),
-        "summary": data[feature_names + target_names].describe().to_dict(),
-        "spearman": data[feature_names + target_names].corr(method="spearman").to_dict(),
-    }
-    (run_dir / "dataset_profile.json").write_text(
-        json.dumps(profile, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+        shared_profile = json.loads(json.dumps(profile))
+        shared_profile["path"] = data_path.name
+        context = json.dumps(
+            {"spec": shared_spec, "dataset_profile": shared_profile}, ensure_ascii=False
+        )
+        individual_findings = [
+            individual_meeting(
+                client,
+                f"individual_{safe_name(agent.title).lower()}",
+                "Audit the experiment and propose the analysis choices that should be brought to the team.\n"
+                + context,
+                agent,
+                0.4,
+                events,
+            )
+            for agent in agents
+        ]
+        individual_context = "\n\n".join(
+            f"[{agents[index].title} individual analysis]\n{finding}"
+            for index, finding in enumerate(individual_findings)
+        )
+        specification_summary = independent_and_merge(
+            client,
+            "project_specification",
+            "[PROJECT_SPECIFICATION] Audit the dataset, features, targets, directions, expected ranges, "
+            "constraints, experimental validity, and blocking ambiguities. Reconcile the individual "
+            "specialist analyses below.\n"
+            + context
+            + "\n\n"
+            + individual_context,
+            agents,
+            runs,
+            rounds,
+            events,
+        )
+        method_summary = independent_and_merge(
+            client,
+            "model_and_decision",
+            "[MODEL_AND_DECISION] Design the model comparison, leakage-aware validation, candidate search, "
+            "multi-target decision method, weight sensitivity, and experimental confirmation. No decision "
+            "method is preselected.\n" + context + "\nPrevious decision:\n" + specification_summary,
+            agents,
+            runs,
+            rounds,
+            events,
+        )
+        analysis_plan = create_analysis_plan(
+            client, spec, specification_summary, method_summary, events
+        )
+        write_json(run_dir / "analysis_plan.json", analysis_plan)
 
-    shared_profile = json.loads(json.dumps(profile))
-    shared_profile["path"] = data_path.name
-    context = json.dumps(
-        {"spec": shared_spec, "dataset_profile": shared_profile}, ensure_ascii=False
-    )
-    specification_summary = parallel_and_merge(
-        client,
-        "project_specification",
-        "[PROJECT_SPECIFICATION] Audit the dataset, features, targets, directions, expected ranges, "
-        "constraints, experimental validity, and blocking ambiguities.\n" + context,
-        agents,
-        runs,
-        rounds,
-        events,
-    )
-    method_summary = parallel_and_merge(
-        client,
-        "model_and_decision",
-        "[MODEL_AND_DECISION] Design the model comparison, leakage-aware validation, candidate search, "
-        "multi-target decision method, weight sensitivity, and experimental confirmation. No decision "
-        "method is preselected.\n" + context + "\nPrevious decision:\n" + specification_summary,
-        agents,
-        runs,
-        rounds,
-        events,
-    )
-    chosen_method = choose_decision_method(spec, method_summary)
-    spec.setdefault("search", {})["decision_method"] = chosen_method
+        if mode == "live" and not args.approve_plan:
+            if not sys.stdin.isatty():
+                raise RuntimeError(
+                    "Live analysis plan requires human approval; review analysis_plan.json and rerun with --approve-plan"
+                )
+            sys.stderr.write(
+                "\nReview the saved analysis plan before execution:\n"
+                + json.dumps(analysis_plan, indent=2, ensure_ascii=False)
+                + "\nApprove this plan? [y/N] "
+            )
+            sys.stderr.flush()
+            if sys.stdin.readline().strip().lower() not in {"y", "yes"}:
+                raise RuntimeError("Human researcher did not approve the live analysis plan")
 
-    resolved_spec_path = run_dir / "experiment_spec.json"
-    # Make the dataset path absolute so the generated program is relocatable within this run.
-    spec.setdefault("dataset", {})["path"] = str(data_path)
-    resolved_spec_path.write_text(json.dumps(spec, indent=2, ensure_ascii=False), encoding="utf-8")
+        search = spec.setdefault("search", {})
+        search["decision_method"] = analysis_plan["decision_method"]
+        search["model_families"] = analysis_plan["model_families"]
+        search["candidate_strategy"] = analysis_plan["candidate_strategy"]
+        spec["analysis_plan"] = analysis_plan
 
-    generated_code_path = run_dir / "generated_pipeline.py"
-    code = (SCRIPT_DIR / "pipeline_core.py").read_text(encoding="utf-8")
-    generated_code_path.write_text(code, encoding="utf-8")
-    command = [
-        sys.executable,
-        str(generated_code_path),
-        "--spec",
-        str(resolved_spec_path),
-        "--output-dir",
-        str(result_dir),
-    ]
-    started = time.monotonic()
-    completed = subprocess.run(command, capture_output=True, text=True, timeout=1800, check=False)
-    execution = {
-        "command": command,
-        "returncode": completed.returncode,
-        "stdout": completed.stdout,
-        "stderr": completed.stderr,
-        "elapsed_seconds": round(time.monotonic() - started, 3),
-        "llm": {
+        resolved_spec_path = run_dir / "experiment_spec.json"
+        spec.setdefault("dataset", {})["path"] = str(data_path)
+        write_json(resolved_spec_path, spec)
+        pipeline_core.load_spec(resolved_spec_path)
+
+        executed_code_path = run_dir / "executed_pipeline.py"
+        code = (SCRIPT_DIR / "pipeline_core.py").read_text(encoding="utf-8")
+        executed_code_path.write_text(code, encoding="utf-8")
+        command = [
+            sys.executable,
+            str(executed_code_path),
+            "--spec",
+            str(resolved_spec_path),
+            "--output-dir",
+            str(result_dir),
+        ]
+        started = time.monotonic()
+        completed = subprocess.run(
+            command, capture_output=True, text=True, timeout=1800, check=False
+        )
+        execution = {
+            "command": command,
+            "returncode": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+            "elapsed_seconds": round(time.monotonic() - started, 3),
+            "llm": {
+                "mode": mode,
+                "provider": provider_config.provider,
+                "model": provider_config.model,
+                "base_url": provider_config.base_url,
+                "credential_source": credential_source if mode == "live" else None,
+            },
+        }
+        write_json(run_dir / "execution.json", execution)
+        if completed.returncode != 0:
+            raise RuntimeError(
+                f"Executed pipeline failed with code {completed.returncode}\n"
+                f"STDOUT:\n{completed.stdout}\nSTDERR:\n{completed.stderr}"
+            )
+        results = json.loads((result_dir / "results.json").read_text(encoding="utf-8"))
+
+        shared_results = results_for_llm(results, data_path.name)
+        final_summary = team_meeting(
+            client,
+            "final_review",
+            "[FINAL_REVIEW] Review the executed metrics, selected parameters, prediction intervals, "
+            "expectation checks, sensitivity, limitations, and the exact next real experiment.\n"
+            + json.dumps(shared_results),
+            agents,
+            1,
+            0.2,
+            events,
+        )
+        results["virtual_lab"] = {
             "mode": mode,
             "provider": provider_config.provider,
             "model": provider_config.model,
             "base_url": provider_config.base_url,
             "credential_source": credential_source if mode == "live" else None,
-        },
-    }
-    (run_dir / "execution.json").write_text(
-        json.dumps(execution, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    if completed.returncode != 0:
-        raise RuntimeError(
-            f"Generated pipeline failed with code {completed.returncode}\n"
-            f"STDOUT:\n{completed.stdout}\nSTDERR:\n{completed.stderr}"
-        )
-    results = json.loads((result_dir / "results.json").read_text(encoding="utf-8"))
+            "generated_agents": [agent.title for agent in agents],
+            "analysis_plan": analysis_plan,
+            "decision_summary": method_summary,
+            "final_review": final_summary,
+        }
+        write_json(result_dir / "results.json", results)
+        events.checkpoint()
+        report = report_markdown(run_id, mode, spec, agents, events, code, execution, results)
+        report_path = run_dir / "virtual_lab_report.md"
+        report_path.write_text(report, encoding="utf-8")
 
-    final_summary = team_meeting(
-        client,
-        "final_review",
-        "[FINAL_REVIEW] Review the executed metrics, selected parameters, expectation checks, "
-        "sensitivity, limitations, and the exact next real experiment.\n" + json.dumps(results),
-        agents,
-        1,
-        0.2,
-        events,
-    )
-    results["virtual_lab"] = {
-        "mode": mode,
-        "provider": provider_config.provider,
-        "model": provider_config.model,
-        "base_url": provider_config.base_url,
-        "credential_source": credential_source if mode == "live" else None,
-        "generated_agents": [agent.title for agent in agents],
-        "decision_summary": method_summary,
-        "final_review": final_summary,
-    }
-    (result_dir / "results.json").write_text(
-        json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    (run_dir / "conversations.json").write_text(
-        json.dumps(events, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    (run_dir / "conversations.md").write_text(conversation_markdown(events), encoding="utf-8")
-    report = report_markdown(run_id, mode, spec, agents, events, code, execution, results)
-    report_path = run_dir / "virtual_lab_report.md"
-    report_path.write_text(report, encoding="utf-8")
-
-    handoff_value = args.handoff_dir or (
-        Path(spec.get("output", {}).get("handoff_directory"))
-        if spec.get("output", {}).get("handoff_directory")
-        else None
-    )
-    handoff_path = None
-    if handoff_value:
-        handoff_dir = handoff_value.expanduser().resolve()
-        handoff_dir.mkdir(parents=True, exist_ok=True)
-        handoff_path = handoff_dir / (
-            f"Virtual Lab Handoff - {safe_name(spec['experiment_name'])} - {run_id}.md"
+        handoff_value = args.handoff_dir or (
+            Path(spec.get("output", {}).get("handoff_directory"))
+            if spec.get("output", {}).get("handoff_directory")
+            else None
         )
-        shutil.copy2(report_path, handoff_path)
+        handoff_path = None
+        if handoff_value:
+            handoff_dir = handoff_value.expanduser().resolve()
+            handoff_dir.mkdir(parents=True, exist_ok=True)
+            handoff_path = handoff_dir / (
+                f"Virtual Lab Handoff - {safe_name(spec['experiment_name'])} - {run_id}.md"
+            )
+            shutil.copy2(report_path, handoff_path)
 
-    print(
-        json.dumps(
-            {
-                "status": "success",
-                "mode": mode,
-                "provider": provider_config.provider,
-                "model": provider_config.model,
-                "run_directory": str(run_dir),
-                "report": str(report_path),
-                "handoff_report": str(handoff_path) if handoff_path else None,
-                "selected": results["selected"],
-            },
-            indent=2,
-            ensure_ascii=False,
+        print(
+            json.dumps(
+                {
+                    "status": "success",
+                    "mode": mode,
+                    "provider": provider_config.provider,
+                    "model": provider_config.model,
+                    "run_directory": str(run_dir),
+                    "report": str(report_path),
+                    "handoff_report": str(handoff_path) if handoff_path else None,
+                    "selected": results["selected"],
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
         )
-    )
+    except BaseException as error:
+        events.checkpoint()
+        partial_results_path = result_dir / "results.json"
+        if partial_results_path.is_file():
+            partial_results = json.loads(partial_results_path.read_text(encoding="utf-8"))
+            partial_results["pipeline_status"] = partial_results.get("status")
+            partial_results["status"] = "failed"
+            partial_results["run_failure"] = {
+                "error_type": type(error).__name__,
+                "message": str(error),
+            }
+            write_json(partial_results_path, partial_results)
+        write_failure_artifacts(run_dir, run_id, spec, mode, error)
+        raise
 
 
 if __name__ == "__main__":

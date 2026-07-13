@@ -50,11 +50,11 @@
     "sensitivity_samples": 300
   },
   "virtual_lab": {
-    "mode": "auto",
+    "mode": "offline",
     "provider": "deepseek",
     "api_key_env": "DEEPSEEK_API_KEY",
     "base_url": null,
-    "parallel_runs": 3,
+    "independent_runs": 3,
     "meeting_rounds": 2,
     "model": "deepseek-v4-pro"
   },
